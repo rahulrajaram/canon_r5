@@ -1,0 +1,58 @@
+# Canon R5 Driver Suite .gitignore
+# Build artifacts and temporary files
+
+# Kernel module build artifacts
+*.ko
+*.o
+*.mod
+*.mod.c
+*.mod.o
+*.cmd
+.tmp_versions/
+Module.symvers
+modules.order
+
+# Object files and dependency files
+*.o
+*.d
+
+# Debug and log files
+debug/
+logs/
+*.log
+
+# Temporary files
+*~
+*.swp
+*.swo
+.*.tmp
+
+# IDE files
+.vscode/
+*.pro.user
+
+# Compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+
+# Testing artifacts
+test_results/
+coverage/
+
+# Distribution packages
+dist/
+*.tar.gz
+*.zip
+
+# Documentation build
+docs/html/
+docs/latex/
+
+# USB capture files
+*.pcap
+usb_trace*
+
+# Backup files
+*.bak
+*.orig

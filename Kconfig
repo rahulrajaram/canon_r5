@@ -1,0 +1,236 @@
+#
+# Canon R5 Linux Driver Suite
+# Kernel configuration options
+#
+# Copyright (C) 2025 Canon R5 Driver Project
+
+config CANON_R5
+	tristate "Canon R5 Camera Driver Suite"
+	depends on USB && VIDEO_DEV && SND
+	select VIDEOBUF2_CORE
+	select VIDEOBUF2_VMALLOC
+	select VIDEOBUF2_MEMOPS
+	select SND_PCM
+	help
+	  This enables support for Canon R5 digital camera, providing
+	  comprehensive integration with Linux through multiple subsystems:
+	  
+	  - Video capture via V4L2 (live view, recording)
+	  - Still image capture via PTP protocol
+	  - Audio capture via ALSA
+	  - Storage access via MTP
+	  - Complete camera control via sysfs
+	  - Power management
+	  - Input device support (buttons, touchscreen)
+	  - Lens communication
+	  - Display control (LCD, EVF)
+	  - Wireless features (GPS, WiFi, Bluetooth)
+	  
+	  The driver suite consists of multiple modules that can be loaded
+	  independently based on required functionality.
+	  
+	  To compile this driver as modules, choose M here: the modules
+	  will be called canon-r5-*.
+
+if CANON_R5
+
+config CANON_R5_CORE
+	tristate "Canon R5 Core Infrastructure"
+	default CANON_R5
+	help
+	  Core infrastructure for Canon R5 driver suite, providing:
+	  - Device management and lifecycle
+	  - USB transport layer
+	  - PTP protocol implementation
+	  - Inter-module communication framework
+	  - Event handling system
+	  
+	  This module is required by all other Canon R5 driver modules.
+
+config CANON_R5_VIDEO
+	tristate "Canon R5 Video Capture (V4L2)"
+	depends on CANON_R5_CORE && VIDEO_V4L2
+	select VIDEOBUF2_CORE
+	select VIDEOBUF2_VMALLOC
+	help
+	  Video capture support for Canon R5 via Video4Linux2 interface.
+	  Provides:
+	  - Live view streaming (MJPEG, H.264, RAW)
+	  - Multiple resolution support (8K, 4K, 1080p, 720p)
+	  - Hardware encoder passthrough
+	  - Zero-copy buffer management
+	  - HDR video support
+	  - Frame rates up to 120fps (1080p)
+	  
+	  Creates /dev/video* devices for use with standard V4L2 applications.
+
+config CANON_R5_STILL
+	tristate "Canon R5 Still Image Capture"
+	depends on CANON_R5_CORE
+	help
+	  Still image capture support for Canon R5, providing:
+	  - RAW (CR3) capture support
+	  - JPEG/HEIF capture
+	  - Burst mode (up to 30fps electronic shutter)
+	  - Bracketing support (exposure, focus, white balance)
+	  - Focus stacking interface
+	  - Dual Pixel RAW support
+	  - Pixel shift multi-shot
+	  
+	  Integrates with libgphoto2 for standard photo application support.
+
+config CANON_R5_AUDIO
+	tristate "Canon R5 Audio Capture (ALSA)"
+	depends on CANON_R5_CORE && SND
+	select SND_PCM
+	help
+	  Audio capture support for Canon R5 via ALSA interface.
+	  Provides:
+	  - External microphone input control
+	  - Built-in microphone support  
+	  - Audio level monitoring
+	  - Sample rate selection (48kHz, 96kHz)
+	  - Audio/video synchronization
+	  - Wind filter control
+	  - Attenuator settings
+	  
+	  Creates ALSA PCM devices for audio recording.
+
+config CANON_R5_STORAGE
+	tristate "Canon R5 Storage Access (MTP)"
+	depends on CANON_R5_CORE
+	help
+	  Storage access support for Canon R5 memory cards via MTP protocol.
+	  Provides:
+	  - Direct card access (CFexpress Type B, SD UHS-II)
+	  - File management without unmounting
+	  - Thumbnail generation
+	  - Metadata extraction
+	  - Parallel dual-card operations
+	  - Card formatting
+	  - File recovery support
+
+config CANON_R5_CONTROL
+	tristate "Canon R5 Camera Control Interface"
+	depends on CANON_R5_CORE
+	help
+	  Complete camera control interface via sysfs and ioctl.
+	  Provides access to all camera settings:
+	  - Exposure controls (mode, shutter, aperture, ISO)
+	  - Focus system (AF modes, tracking, focus points)
+	  - Image processing (picture styles, white balance)
+	  - Stabilization (IBIS, lens IS coordination)
+	  - Advanced features (HDR, bracketing, intervalometer)
+	  
+	  Controls are exposed through /sys/class/canon-r5/ hierarchy.
+
+config CANON_R5_POWER
+	tristate "Canon R5 Power Management"
+	depends on CANON_R5_CORE
+	help
+	  Power management support for Canon R5, providing:
+	  - USB Power Delivery support
+	  - Battery status monitoring (LP-E6NH)
+	  - Battery grip support (BG-R10)  
+	  - Thermal management
+	  - Sleep/wake control
+	  - Power profile selection
+	  - AC adapter detection
+	  
+	  Integrates with Linux power supply subsystem.
+
+config CANON_R5_INPUT
+	tristate "Canon R5 Input Devices"
+	depends on CANON_R5_CORE && INPUT
+	help
+	  Input device support for Canon R5 physical controls.
+	  Provides:
+	  - Button press events (all physical buttons)
+	  - Dial rotation events (main, quick control, mode)
+	  - Joystick movements
+	  - Card insertion/removal events
+	  - Lens attachment/detachment events
+	  - Touchscreen support (3.2" LCD)
+	  
+	  Creates standard Linux input devices (/dev/input/event*).
+
+config CANON_R5_LENS
+	tristate "Canon R5 Lens Communication"
+	depends on CANON_R5_CORE
+	help
+	  Lens communication and control support for Canon R5.
+	  Provides:
+	  - RF/EF lens detection and identification
+	  - Lens metadata reading
+	  - Focus motor control with speed control
+	  - Aperture control
+	  - IS coordination with IBIS
+	  - Lens aberration correction data
+	  - Focus breathing compensation
+	  
+	  Lens information exposed via /sys/class/canon-r5/lens/.
+
+config CANON_R5_DISPLAY
+	tristate "Canon R5 Display Control"
+	depends on CANON_R5_CORE && FB
+	help
+	  Display control support for Canon R5 LCD and EVF.
+	  Provides:
+	  - LCD brightness and settings control
+	  - EVF detection and switching (5.76M dots, 120fps)
+	  - Display brightness control
+	  - Custom info overlays
+	  - Histogram display
+	  - Focus peaking overlay
+	  - Zebra pattern overlay
+	  
+	  Integrates with Linux framebuffer and backlight subsystems.
+
+config CANON_R5_WIRELESS
+	tristate "Canon R5 Wireless Features"
+	depends on CANON_R5_CORE
+	help
+	  Wireless connectivity support for Canon R5.
+	  Provides:
+	  - GPS location tagging
+	  - WiFi 5GHz/2.4GHz support
+	  - WiFi access point mode
+	  - Bluetooth LE remote control
+	  - Time synchronization
+	  - Smartphone app integration (Camera Connect)
+	  - FTP/FTPS transfer
+	  - Cloud service integration
+	  
+	  Integrates with standard Linux wireless subsystems.
+
+config CANON_R5_DEBUG
+	bool "Canon R5 Debug Support"
+	depends on CANON_R5_CORE
+	help
+	  Enable comprehensive debugging support for Canon R5 drivers.
+	  This adds:
+	  - Detailed kernel log messages
+	  - USB transaction logging
+	  - PTP command/response tracing
+	  - Performance profiling
+	  - Memory allocation tracking
+	  
+	  Only enable for development and debugging purposes as it
+	  significantly increases log verbosity and may impact performance.
+
+config CANON_R5_ADVANCED
+	bool "Canon R5 Advanced Features"
+	depends on CANON_R5_CORE
+	help
+	  Enable advanced and experimental features for Canon R5.
+	  This includes:
+	  - Multiple camera support
+	  - Custom firmware loading
+	  - Advanced timing controls
+	  - Low-level hardware access
+	  - Experimental PTP extensions
+	  
+	  These features are for advanced users and developers only.
+	  Use with caution as they may affect camera stability.
+
+endif # CANON_R5
