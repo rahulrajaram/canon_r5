@@ -18,15 +18,17 @@ ARCH := $(shell uname -m)
 obj-m += canon-r5-core.o
 obj-m += canon-r5-usb.o
 
+# Video drivers
+obj-m += canon-r5-video.o
+
 # Core module object files
 canon-r5-core-objs := drivers/core/canon-r5-core.o drivers/core/canon-r5-ptp.o
 canon-r5-usb-objs := drivers/core/canon-r5-usb.o
 
-# Video drivers (when implemented)
-# obj-m += canon-r5-video.o
-# canon-r5-video-objs := drivers/video/canon-r5-v4l2.o \
-#                        drivers/video/canon-r5-encoder.o \
-#                        drivers/video/canon-r5-streaming.o
+# Video module object files
+canon-r5-video-objs := drivers/video/canon-r5-v4l2.o \
+                       drivers/video/canon-r5-videobuf2.o \
+                       drivers/video/canon-r5-liveview.o
 
 # Still image drivers (when implemented)
 # obj-m += canon-r5-still.o

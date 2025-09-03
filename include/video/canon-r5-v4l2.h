@@ -10,7 +10,6 @@
 #define __CANON_R5_V4L2_H__
 
 #include <linux/videodev2.h>
-#include <linux/v4l2-device.h>
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
@@ -131,6 +130,7 @@ struct canon_r5_video {
 	/* Frame processing */
 	struct work_struct		frame_processor_work;
 	struct workqueue_struct		*frame_processor_wq;
+	struct timer_list		frame_timer;
 };
 
 /* Format definitions */
@@ -148,14 +148,28 @@ void canon_r5_video_cleanup(struct canon_r5_device *dev);
 int canon_r5_video_register_devices(struct canon_r5_device *dev);
 void canon_r5_video_unregister_devices(struct canon_r5_device *dev);
 
+/* Enhanced initialization */
+int canon_r5_video_init_enhanced(struct canon_r5_device *canon_dev);
+void canon_r5_video_cleanup_enhanced(struct canon_r5_device *canon_dev);
+int canon_r5_video_init_device(struct canon_r5_device *canon_dev,
+			       struct canon_r5_video_device *vdev,
+			       enum canon_r5_video_type type);
+
 /* Frame handling */
 int canon_r5_video_queue_frame(struct canon_r5_video_device *vdev, 
 			       const void *frame_data, size_t frame_size);
 void canon_r5_video_frame_done(struct canon_r5_video_device *vdev);
+void canon_r5_video_frame_work(struct work_struct *work);
 
 /* Live view control */
 int canon_r5_video_start_live_view(struct canon_r5_device *dev);
 int canon_r5_video_stop_live_view(struct canon_r5_device *dev);
+
+/* VB2 functions */
+int canon_r5_vb2_queue_init(struct canon_r5_video_device *vdev);
+void canon_r5_vb2_return_all_buffers(struct canon_r5_video_device *vdev,
+				     enum vb2_buffer_state state);
+struct canon_r5_video_buffer *canon_r5_vb2_get_next_buffer(struct canon_r5_video_device *vdev);
 
 /* V4L2 operations */
 extern const struct v4l2_file_operations canon_r5_video_fops;
@@ -218,19 +232,19 @@ int canon_r5_video_get_stats(struct canon_r5_video_device *vdev,
 
 /* Debugging */
 #define canon_r5_video_dbg(vdev, fmt, ...) \
-	canon_r5_dbg((vdev)->canon_dev, "[VIDEO:%s] " fmt, \
+	dev_dbg((vdev)->canon_dev->dev, "[VIDEO:%s] " fmt, \
 		    canon_r5_video_type_name((vdev)->type), ##__VA_ARGS__)
 
 #define canon_r5_video_info(vdev, fmt, ...) \
-	canon_r5_info((vdev)->canon_dev, "[VIDEO:%s] " fmt, \
+	dev_info((vdev)->canon_dev->dev, "[VIDEO:%s] " fmt, \
 		     canon_r5_video_type_name((vdev)->type), ##__VA_ARGS__)
 
 #define canon_r5_video_warn(vdev, fmt, ...) \
-	canon_r5_warn((vdev)->canon_dev, "[VIDEO:%s] " fmt, \
+	dev_warn((vdev)->canon_dev->dev, "[VIDEO:%s] " fmt, \
 		     canon_r5_video_type_name((vdev)->type), ##__VA_ARGS__)
 
 #define canon_r5_video_err(vdev, fmt, ...) \
-	canon_r5_err((vdev)->canon_dev, "[VIDEO:%s] " fmt, \
+	dev_err((vdev)->canon_dev->dev, "[VIDEO:%s] " fmt, \
 		    canon_r5_video_type_name((vdev)->type), ##__VA_ARGS__)
 
 #endif /* __CANON_R5_V4L2_H__ */
