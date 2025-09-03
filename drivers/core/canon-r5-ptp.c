@@ -563,3 +563,172 @@ void canon_r5_ptp_cleanup(struct canon_r5_device *dev)
 	canon_r5_info(dev, "PTP layer cleaned up");
 }
 EXPORT_SYMBOL_GPL(canon_r5_ptp_cleanup);
+
+/* Still Image Capture PTP Functions */
+
+/* Single shot capture */
+int canon_r5_ptp_capture_single(struct canon_r5_device *dev)
+{
+	u16 response_code;
+	int ret;
+	
+	if (!dev)
+		return -EINVAL;
+	
+	canon_r5_info(dev, "Starting single shot capture");
+	
+	ret = canon_r5_ptp_command(dev, CANON_PTP_OP_CAPTURE, NULL, 0,
+				  NULL, 0, &response_code);
+	if (ret) {
+		dev_err(dev->dev, "Failed to send capture command: %d", ret);
+		return ret;
+	}
+	
+	if (response_code != PTP_RC_OK) {
+		dev_err(dev->dev, "Capture command failed: 0x%04x", response_code);
+		return -EIO;
+	}
+	
+	canon_r5_info(dev, "Single shot capture completed");
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_capture_single);
+
+/* Burst capture */
+int canon_r5_ptp_capture_burst(struct canon_r5_device *dev, u16 count)
+{
+	u32 params[1];
+	u16 response_code;
+	int ret;
+	
+	if (!dev)
+		return -EINVAL;
+	
+	if (count == 0 || count > 999) {
+		dev_err(dev->dev, "Invalid burst count: %u", count);
+		return -EINVAL;
+	}
+	
+	canon_r5_info(dev, "Starting burst capture of %u images", count);
+	
+	params[0] = count;
+	
+	ret = canon_r5_ptp_command(dev, CANON_PTP_OP_CAPTURE_BURST, params, 1,
+				  NULL, 0, &response_code);
+	if (ret) {
+		dev_err(dev->dev, "Failed to send burst capture command: %d", ret);
+		return ret;
+	}
+	
+	if (response_code != PTP_RC_OK) {
+		dev_err(dev->dev, "Burst capture command failed: 0x%04x", response_code);
+		return -EIO;
+	}
+	
+	canon_r5_info(dev, "Burst capture of %u images started", count);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_capture_burst);
+
+/* Autofocus operation */
+int canon_r5_ptp_autofocus(struct canon_r5_device *dev)
+{
+	u16 response_code;
+	int ret;
+	
+	if (!dev)
+		return -EINVAL;
+	
+	canon_r5_info(dev, "Starting autofocus operation");
+	
+	ret = canon_r5_ptp_command(dev, CANON_PTP_OP_AUTOFOCUS, NULL, 0,
+				  NULL, 0, &response_code);
+	if (ret) {
+		dev_err(dev->dev, "Failed to send autofocus command: %d", ret);
+		return ret;
+	}
+	
+	if (response_code != PTP_RC_OK) {
+		dev_warn(dev->dev, "Autofocus operation result: 0x%04x", response_code);
+		return (response_code == 0x2019) ? -EAGAIN : -EIO; /* Focus failed vs other error */
+	}
+	
+	canon_r5_info(dev, "Autofocus operation completed successfully");
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_autofocus);
+
+/* Remaining PTP still capture functions - stub implementations for now */
+
+int canon_r5_ptp_manual_focus(struct canon_r5_device *dev, u32 position)
+{
+	if (!dev) return -EINVAL;
+	canon_r5_info(dev, "Manual focus stub: position %u", position);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_manual_focus);
+
+int canon_r5_ptp_get_focus_info(struct canon_r5_device *dev, u32 *position, bool *achieved)
+{
+	if (!dev || !position || !achieved) return -EINVAL;
+	*position = 100; *achieved = true;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_get_focus_info);
+
+int canon_r5_ptp_set_image_quality(struct canon_r5_device *dev, u32 format, u32 size, u32 quality)
+{
+	if (!dev) return -EINVAL;
+	canon_r5_info(dev, "Set image quality stub: %u/%u/%u", format, size, quality);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_set_image_quality);
+
+int canon_r5_ptp_get_image_quality(struct canon_r5_device *dev, u32 *format, u32 *size, u32 *quality)
+{
+	if (!dev || !format || !size || !quality) return -EINVAL;
+	*format = 0; *size = 1; *quality = 8;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_get_image_quality);
+
+int canon_r5_ptp_bulb_start(struct canon_r5_device *dev)
+{
+	if (!dev) return -EINVAL;
+	canon_r5_info(dev, "Bulb start stub");
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_bulb_start);
+
+int canon_r5_ptp_bulb_end(struct canon_r5_device *dev)
+{
+	if (!dev) return -EINVAL;
+	canon_r5_info(dev, "Bulb end stub");
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_bulb_end);
+
+int canon_r5_ptp_set_bracketing(struct canon_r5_device *dev, u8 shots, s8 step)
+{
+	if (!dev) return -EINVAL;
+	canon_r5_info(dev, "Set bracketing stub: %u shots, %d step", shots, step);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_set_bracketing);
+
+int canon_r5_ptp_get_battery_info(struct canon_r5_device *dev, u32 *level, u32 *status)
+{
+	if (!dev || !level || !status) return -EINVAL;
+	*level = 85; *status = 1;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_get_battery_info);
+
+int canon_r5_ptp_get_captured_image(struct canon_r5_device *dev, u32 object_id, void **data, size_t *size)
+{
+	if (!dev || !data || !size) return -EINVAL;
+	canon_r5_info(dev, "Get captured image stub: object_id 0x%08x", object_id);
+	*data = NULL; *size = 0;
+	return -ENODATA;
+}
+EXPORT_SYMBOL_GPL(canon_r5_ptp_get_captured_image);

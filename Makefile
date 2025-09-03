@@ -30,11 +30,9 @@ canon-r5-video-objs := drivers/video/canon-r5-v4l2.o \
                        drivers/video/canon-r5-videobuf2.o \
                        drivers/video/canon-r5-liveview.o
 
-# Still image drivers (when implemented)
-# obj-m += canon-r5-still.o
-# canon-r5-still-objs := drivers/still/canon-r5-capture.o \
-#                        drivers/still/canon-r5-raw.o \
-#                        drivers/still/canon-r5-burst.o
+# Still image drivers
+obj-m += canon-r5-still.o
+canon-r5-still-objs := drivers/still/canon-r5-still.o
 
 # Audio drivers (when implemented)
 # obj-m += canon-r5-audio.o

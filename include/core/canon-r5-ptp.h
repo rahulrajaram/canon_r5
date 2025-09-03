@@ -52,6 +52,19 @@
 #define CANON_PTP_OP_LIVEVIEW_START	0x9153
 #define CANON_PTP_OP_LIVEVIEW_STOP	0x9154
 #define CANON_PTP_OP_GET_LIVEVIEW	0x9155
+
+/* Canon Still Image Capture operations */
+#define CANON_PTP_OP_SET_IMAGE_QUALITY	0x9158
+#define CANON_PTP_OP_GET_IMAGE_QUALITY	0x9159
+#define CANON_PTP_OP_BULB_START		0x915A
+#define CANON_PTP_OP_BULB_END		0x915B
+#define CANON_PTP_OP_AUTOFOCUS		0x915C
+#define CANON_PTP_OP_MANUAL_FOCUS	0x915D
+#define CANON_PTP_OP_SET_BRACKETING	0x915E
+#define CANON_PTP_OP_GET_FOCUS_INFO	0x915F
+#define CANON_PTP_OP_CAPTURE_BURST	0x9160
+#define CANON_PTP_OP_SET_WB		0x9161
+#define CANON_PTP_OP_GET_BATTERY	0x9162
 #define CANON_PTP_OP_LIVEVIEW_LOCK	0x9156
 #define CANON_PTP_OP_LIVEVIEW_UNLOCK	0x9157
 
@@ -275,5 +288,19 @@ int canon_r5_ptp_set_property(struct canon_r5_device *dev, u16 property,
 /* Event handling */
 int canon_r5_ptp_check_event(struct canon_r5_device *dev);
 void canon_r5_ptp_event_handler(struct work_struct *work);
+
+/* Still image capture PTP functions */
+int canon_r5_ptp_capture_single(struct canon_r5_device *dev);
+int canon_r5_ptp_capture_burst(struct canon_r5_device *dev, u16 count);
+int canon_r5_ptp_autofocus(struct canon_r5_device *dev);
+int canon_r5_ptp_manual_focus(struct canon_r5_device *dev, u32 position);
+int canon_r5_ptp_get_focus_info(struct canon_r5_device *dev, u32 *position, bool *achieved);
+int canon_r5_ptp_set_image_quality(struct canon_r5_device *dev, u32 format, u32 size, u32 quality);
+int canon_r5_ptp_get_image_quality(struct canon_r5_device *dev, u32 *format, u32 *size, u32 *quality);
+int canon_r5_ptp_bulb_start(struct canon_r5_device *dev);
+int canon_r5_ptp_bulb_end(struct canon_r5_device *dev);
+int canon_r5_ptp_set_bracketing(struct canon_r5_device *dev, u8 shots, s8 step);
+int canon_r5_ptp_get_battery_info(struct canon_r5_device *dev, u32 *level, u32 *status);
+int canon_r5_ptp_get_captured_image(struct canon_r5_device *dev, u32 object_id, void **data, size_t *size);
 
 #endif /* __CANON_R5_PTP_H__ */
