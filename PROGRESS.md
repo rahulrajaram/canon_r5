@@ -688,4 +688,4 @@ This project is licensed under GPL v2, consistent with Linux kernel modules.
 ### Hardware
 - Canon R5 official specifications
 - USB 3.0 specification
-- Canon SDK documentation (if available)
+- Canon SDK documentation (if available)\nCI: trigger re-run 2025-09-06T05:25:27Z
