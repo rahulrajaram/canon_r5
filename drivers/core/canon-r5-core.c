@@ -8,6 +8,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/device.h>
@@ -469,7 +470,11 @@ void canon_r5_unregister_wireless_driver(struct canon_r5_device *dev)
 }
 EXPORT_SYMBOL_GPL(canon_r5_unregister_wireless_driver);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,4,0)
+static ssize_t version_show(const struct class *class, const struct class_attribute *attr, char *buf)
+#else
 static ssize_t version_show(struct class *class, struct class_attribute *attr, char *buf)
+#endif
 {
 	return sprintf(buf, "%s\n", CANON_R5_DRIVER_VERSION);
 }
@@ -487,7 +492,11 @@ int canon_r5_core_init(void)
 	
 	pr_info("Canon R5 Driver Suite v%s - Core Module Loading\n", CANON_R5_DRIVER_VERSION);
 	
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,4,0)
+	canon_r5_class = class_create(CANON_R5_MODULE_NAME);
+#else
 	canon_r5_class = class_create(THIS_MODULE, CANON_R5_MODULE_NAME);
+#endif
 	if (IS_ERR(canon_r5_class)) {
 		ret = PTR_ERR(canon_r5_class);
 		pr_err("Failed to create class: %d\n", ret);
