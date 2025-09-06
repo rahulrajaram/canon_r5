@@ -20,7 +20,7 @@ obj-m += canon-r5-storage.o
 # Source file mappings
 canon-r5-core-objs := drivers/core/canon-r5-core.o drivers/core/canon-r5-ptp.o
 canon-r5-usb-objs := drivers/core/canon-r5-usb.o
-canon-r5-video-objs := drivers/video/canon-r5-video.o
+canon-r5-video-objs := drivers/video/canon-r5-v4l2.o drivers/video/canon-r5-videobuf2.o drivers/video/canon-r5-liveview.o
 canon-r5-still-objs := drivers/still/canon-r5-still.o
 canon-r5-audio-objs := drivers/audio/canon-r5-audio.o
 canon-r5-storage-objs := drivers/storage/canon-r5-storage.o drivers/storage/canon-r5-filesystem.o
