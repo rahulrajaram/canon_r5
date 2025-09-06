@@ -16,7 +16,6 @@
 
 #include "../../include/core/canon-r5.h"
 #include "../../include/core/canon-r5-ptp.h"
-#include "../../include/core/canon-r5-usb.h"
 
 /* USB transport layer structure */
 struct canon_r5_usb {
