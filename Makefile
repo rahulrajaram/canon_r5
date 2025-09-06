@@ -46,15 +46,11 @@ all: modules
 modules:
 	@echo "Building Canon R5 Driver Suite v$(DRIVER_VERSION)"
 	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules
-	@echo "Organizing build artifacts..."
-	@mkdir -p build/modules/
-	@cp *.ko build/modules/ 2>/dev/null || echo "No modules to organize"
-	@echo "Build complete - modules available in build/modules/"
+	@echo "Build complete - modules built successfully"
 
 clean:
 	@echo "Cleaning build artifacts..."
 	# Clean build artifacts without using unsupported modules_clean target
-	@rm -rf build/
 	@rm -f *.ko *.mod *.mod.c *.o Module.symvers modules.order
 	@find . -name "*.cmd" -delete 2>/dev/null || true
 	@find . -name "*.o.d" -delete 2>/dev/null || true

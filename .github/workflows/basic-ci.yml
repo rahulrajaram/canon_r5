@@ -41,10 +41,10 @@ jobs:
           make modules
           
           echo "Checking built modules..."
-          ls -la build/modules/*.ko || echo "No modules found"
+          ls -la *.ko || echo "No modules found"
           
           # Basic module validation
-          for module in build/modules/*.ko; do
+          for module in *.ko; do
             if [ -f "$module" ]; then
               echo "Module info for $(basename "$module"):"
               modinfo "$module" || echo "Could not get module info"
@@ -90,10 +90,10 @@ jobs:
           echo "" >> ci-report.txt
           
           echo "### Build Status" >> ci-report.txt
-          if ls build/modules/*.ko >/dev/null 2>&1; then
+          if ls *.ko >/dev/null 2>&1; then
             echo "✅ Modules built successfully" >> ci-report.txt
             echo "Built modules:" >> ci-report.txt
-            ls -1 build/modules/*.ko | while read module; do
+            ls -1 *.ko | while read module; do
               echo "- $(basename "$module")" >> ci-report.txt
             done
           else
