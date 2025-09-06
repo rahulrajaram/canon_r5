@@ -115,6 +115,7 @@ jobs:
           name: basic-ci-results
           path: |
             ci-report.txt
+            *.ko
             build/modules/
           retention-days: 7
 
