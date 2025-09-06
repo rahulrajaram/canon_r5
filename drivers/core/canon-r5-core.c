@@ -469,7 +469,7 @@ void canon_r5_unregister_wireless_driver(struct canon_r5_device *dev)
 }
 EXPORT_SYMBOL_GPL(canon_r5_unregister_wireless_driver);
 
-static ssize_t version_show(struct class *class, struct class_attribute *attr, char *buf)
+static ssize_t version_show(const struct class *class, const struct class_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%s\n", CANON_R5_DRIVER_VERSION);
 }
@@ -487,7 +487,7 @@ int canon_r5_core_init(void)
 	
 	pr_info("Canon R5 Driver Suite v%s - Core Module Loading\n", CANON_R5_DRIVER_VERSION);
 	
-	canon_r5_class = class_create(THIS_MODULE, CANON_R5_MODULE_NAME);
+	canon_r5_class = class_create(CANON_R5_MODULE_NAME);
 	if (IS_ERR(canon_r5_class)) {
 		ret = PTR_ERR(canon_r5_class);
 		pr_err("Failed to create class: %d\n", ret);
