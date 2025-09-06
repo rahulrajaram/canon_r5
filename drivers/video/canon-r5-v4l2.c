@@ -423,7 +423,7 @@ int canon_r5_video_init_device(struct canon_r5_device *canon_dev,
 			       enum canon_r5_video_type type)
 {
 	struct video_device *video_dev = &vdev->vdev;
-	int ret;
+	/* ret reserved for future error handling */
 	
 	vdev->canon_dev = canon_dev;
 	vdev->type = type;

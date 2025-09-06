@@ -195,10 +195,8 @@ int canon_r5_still_validate_capture_settings(const struct canon_r5_capture_setti
 
 void *canon_r5_still_alloc_image_buffer(struct canon_r5_still_device *still, size_t size)
 {
-	struct canon_r5_still *driver_data;
-	unsigned long flags;
-	void *buffer;
-	int bit;
+    struct canon_r5_still *driver_data;
+    void *buffer;
 	
 	if (!still || !still->canon_dev)
 		return NULL;

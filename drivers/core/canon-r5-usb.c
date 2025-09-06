@@ -46,7 +46,8 @@ static const struct usb_device_id canon_r5_usb_id_table[] = {
 MODULE_DEVICE_TABLE(usb, canon_r5_usb_id_table);
 
 /* USB bulk transfer completion callback */
-static void canon_r5_usb_bulk_callback(struct urb *urb)
+/* Not currently used; keep as placeholder but annotate to avoid warnings */
+static void __maybe_unused canon_r5_usb_bulk_callback(struct urb *urb)
 {
 	struct canon_r5_device *dev = urb->context;
 	
@@ -235,7 +236,7 @@ static void canon_r5_usb_cleanup_endpoints(struct canon_r5_device *dev)
 }
 
 /* Send data via USB bulk out */
-int canon_r5_usb_bulk_send(struct canon_r5_device *dev, const void *data, size_t len)
+static int canon_r5_usb_bulk_send(struct canon_r5_device *dev, const void *data, size_t len)
 {
 	void *transfer_buffer;
 	int actual_len;
@@ -273,7 +274,7 @@ int canon_r5_usb_bulk_send(struct canon_r5_device *dev, const void *data, size_t
 EXPORT_SYMBOL_GPL(canon_r5_usb_bulk_send);
 
 /* Receive data via USB bulk in */
-int canon_r5_usb_bulk_receive(struct canon_r5_device *dev, void *data, size_t len, size_t *actual_len)
+static int canon_r5_usb_bulk_receive(struct canon_r5_device *dev, void *data, size_t len, size_t *actual_len)
 {
 	void *transfer_buffer;
 	int received_len;
