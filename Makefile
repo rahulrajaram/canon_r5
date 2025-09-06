@@ -14,7 +14,20 @@ obj-m += canon-r5-core.o
 obj-m += canon-r5-usb.o
 obj-m += canon-r5-video.o
 obj-m += canon-r5-still.o
-obj-m += canon-r5-audio.o
+###### Audio module conditional inclusion (auto-detect ALSA) ######
+ALSA_AUTO_CONF := $(KERNEL_DIR)/include/generated/autoconf.h
+ALSA_SYMVERS   := $(KERNEL_DIR)/Module.symvers
+HAS_SND       := $(shell [ -f $(ALSA_AUTO_CONF) ] && grep -q '^#define CONFIG_SND ' $(ALSA_AUTO_CONF) && echo 1 || echo 0)
+HAS_SND_PCM   := $(shell [ -f $(ALSA_AUTO_CONF) ] && grep -q '^#define CONFIG_SND_PCM ' $(ALSA_AUTO_CONF) && echo 1 || echo 0)
+HAS_SND_SYMS  := $(shell [ -f $(ALSA_SYMVERS) ] && awk '{print $$2}' $(ALSA_SYMVERS) | grep -E '^(snd_ctl_add|snd_pcm_new)$' >/dev/null && echo 1 || echo 0)
+
+ifeq ($(HAS_SND)$(HAS_SND_PCM),11)
+  obj-m += canon-r5-audio.o
+else ifeq ($(HAS_SND_SYMS),1)
+  obj-m += canon-r5-audio.o
+else
+  $(info Skipping canon-r5-audio: ALSA (SND/SND_PCM) not present in target kernel)
+endif
 obj-m += canon-r5-storage.o
 
 # Source file mappings

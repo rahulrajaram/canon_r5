@@ -16,6 +16,7 @@
 
 #include "../../include/core/canon-r5.h"
 #include "../../include/core/canon-r5-ptp.h"
+#include "../../include/core/canon-r5-usb.h"
 
 /* USB transport layer structure */
 struct canon_r5_usb {
@@ -236,7 +237,7 @@ static void canon_r5_usb_cleanup_endpoints(struct canon_r5_device *dev)
 }
 
 /* Send data via USB bulk out */
-static int canon_r5_usb_bulk_send(struct canon_r5_device *dev, const void *data, size_t len)
+int canon_r5_usb_bulk_send(struct canon_r5_device *dev, const void *data, size_t len)
 {
 	void *transfer_buffer;
 	int actual_len;
@@ -274,7 +275,7 @@ static int canon_r5_usb_bulk_send(struct canon_r5_device *dev, const void *data,
 EXPORT_SYMBOL_GPL(canon_r5_usb_bulk_send);
 
 /* Receive data via USB bulk in */
-static int canon_r5_usb_bulk_receive(struct canon_r5_device *dev, void *data, size_t len, size_t *actual_len)
+int canon_r5_usb_bulk_receive(struct canon_r5_device *dev, void *data, size_t len, size_t *actual_len)
 {
 	void *transfer_buffer;
 	int received_len;
