@@ -47,7 +47,8 @@ modules:
 	@echo "Building Canon R5 Driver Suite v$(DRIVER_VERSION)"
 	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules
 	@echo "Organizing build artifacts..."
-	@$(PWD)/scripts/organize_build.sh
+	@mkdir -p build/modules/
+	@cp *.ko build/modules/ 2>/dev/null || echo "No modules to organize"
 	@echo "Build complete - modules available in build/modules/"
 
 clean:
@@ -135,10 +136,20 @@ security-check:
 			gitleaks detect --source . --config .gitleaks.toml --verbose; \
 		else \
 			echo "GitLeaks not installed - downloading..."; \
-			wget -O gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz; \
+			LATEST_URL=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+				| grep browser_download_url \
+				| grep -i linux \
+				| grep -Ei 'x64|x86_64|amd64' \
+				| grep -i tar.gz \
+				| head -n1 \
+				| cut -d '"' -f4); \
+			if [ -z "$LATEST_URL" ]; then \
+				echo "Failed to resolve latest GitLeaks asset URL"; exit 1; \
+			fi; \
+			wget -O gitleaks.tar.gz "$LATEST_URL"; \
 			tar -xzf gitleaks.tar.gz; \
 			./gitleaks detect --source . --config .gitleaks.toml --verbose; \
-			rm gitleaks gitleaks.tar.gz; \
+			rm -f gitleaks gitleaks.tar.gz; \
 		fi; \
 	fi
 	

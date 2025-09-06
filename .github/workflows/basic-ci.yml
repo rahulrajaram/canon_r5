@@ -6,8 +6,7 @@ on:
   pull_request:
     branches: [ main, master ]
 
-env:
-  KBUILD_OUTPUT: build
+# No global KBUILD_OUTPUT - let the Makefile handle output organization
 
 jobs:
   basic-build-and-test:
@@ -129,8 +128,23 @@ jobs:
 
       - name: Install security tools
         run: |
-          # Install GitLeaks
-          wget -O gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz
+          # Install GitLeaks with dynamic URL resolution
+          echo "Resolving latest GitLeaks download URL..."
+          LATEST_URL=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+            | grep browser_download_url \
+            | grep -i linux \
+            | grep -Ei 'x64|x86_64|amd64' \
+            | grep -i tar.gz \
+            | head -n1 \
+            | cut -d '"' -f4)
+          
+          if [ -z "$LATEST_URL" ]; then
+            echo "Failed to resolve latest GitLeaks asset URL"
+            exit 1
+          fi
+          
+          echo "Downloading GitLeaks from: $LATEST_URL"
+          wget -O gitleaks.tar.gz "$LATEST_URL"
           tar -xzf gitleaks.tar.gz
           chmod +x gitleaks
 
