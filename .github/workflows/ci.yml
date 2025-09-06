@@ -8,7 +8,7 @@ on:
     branches: [ main ]
 
 env:
-  KBUILD_OUTPUT: build
+  # Avoid forcing KBUILD_OUTPUT; external module builds expect artifacts in-tree
 
 jobs:
   build-and-test:
@@ -79,7 +79,7 @@ jobs:
         make modules
         
         echo "Checking built modules..."
-        ls -la *.ko
+        ls -la *.ko || (echo "No modules found in root" && false)
         
         # Verify module info
         for module in *.ko; do
@@ -325,3 +325,44 @@ jobs:
         # Count functions
         func_count=$(grep -r "^[a-zA-Z_][a-zA-Z0-9_]*.*(" drivers/ include/ | grep -v "^\s*//" | wc -l)
         echo "Approximate function count: $func_count"
+
+
+  audio-compile-stable:
+    name: Compile Audio Against linux-stable (compile-only)
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install build deps
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y           build-essential           bc           flex           bison           libelf-dev           libssl-dev           kmod           git           wget
+
+    - name: Fetch linux-stable (6.11.y)
+      run: |
+        git clone --depth 1 --branch linux-6.11.y https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git linux-src
+
+    - name: Configure kernel with ALSA enabled
+      working-directory: linux-src
+      run: |
+        make defconfig
+        ./scripts/config --enable CONFIG_SND
+        ./scripts/config --enable CONFIG_SND_PCM
+        make olddefconfig
+        make -j"$(nproc)" modules_prepare
+
+    - name: Build modules against linux-stable
+      run: |
+        make clean
+        make KERNEL_DIR=$PWD/linux-src modules
+        ls -la *.ko || true
+        modinfo ./canon-r5-audio.ko || true
+
+    - name: Upload audio module (compile-only)
+      uses: actions/upload-artifact@v4
+      with:
+        name: audio-linux-stable-6.11
+        path: |
+          canon-r5-audio.ko
+        retention-days: 7

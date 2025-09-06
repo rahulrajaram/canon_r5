@@ -6,8 +6,7 @@ on:
   pull_request:
     branches: [ main, master ]
 
-env:
-  KBUILD_OUTPUT: build
+# No global KBUILD_OUTPUT - let the Makefile handle output organization
 
 jobs:
   basic-build-and-test:
@@ -42,10 +41,10 @@ jobs:
           make modules
           
           echo "Checking built modules..."
-          ls -la build/modules/*.ko || echo "No modules found"
+          ls -la *.ko || echo "No modules found"
           
           # Basic module validation
-          for module in build/modules/*.ko; do
+          for module in *.ko; do
             if [ -f "$module" ]; then
               echo "Module info for $(basename "$module"):"
               modinfo "$module" || echo "Could not get module info"
@@ -91,10 +90,10 @@ jobs:
           echo "" >> ci-report.txt
           
           echo "### Build Status" >> ci-report.txt
-          if ls build/modules/*.ko >/dev/null 2>&1; then
+          if ls *.ko >/dev/null 2>&1; then
             echo "✅ Modules built successfully" >> ci-report.txt
             echo "Built modules:" >> ci-report.txt
-            ls -1 build/modules/*.ko | while read module; do
+            ls -1 *.ko | while read module; do
               echo "- $(basename "$module")" >> ci-report.txt
             done
           else
@@ -116,6 +115,7 @@ jobs:
           name: basic-ci-results
           path: |
             ci-report.txt
+            *.ko
             build/modules/
           retention-days: 7
 
@@ -129,10 +129,31 @@ jobs:
 
       - name: Install security tools
         run: |
-          # Install GitLeaks
-          wget -O gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz
-          tar -xzf gitleaks.tar.gz
-          chmod +x gitleaks
+          set -euo pipefail
+          echo "Resolving latest GitLeaks download URL..."
+          LATEST_URL=""
+          # Try GitHub API resolution
+          if command -v curl >/dev/null 2>&1; then
+            LATEST_URL=$(curl -fsSL https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+              | grep -E 'browser_download_url' \
+              | grep -Ei 'linux.*(x64|x86_64|amd64).*\.tar\.gz' \
+              | cut -d '"' -f4 \
+              | head -n1 || true)
+          fi
+          # Fallback to latest/download stable asset naming
+          if [ -z "$LATEST_URL" ]; then
+            # Map architecture (default to x64 on x86_64)
+            ARCH="x64"
+            if uname -m | grep -qiE 'aarch64|arm64'; then ARCH="arm64"; fi
+            LATEST_URL="https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_${ARCH}.tar.gz"
+            echo "Using fallback URL: $LATEST_URL"
+          else
+            echo "Resolved URL: $LATEST_URL"
+          fi
+          # Download and extract
+          wget -q -O gitleaks.tar.gz "$LATEST_URL" || { echo "Failed to download GitLeaks"; exit 1; }
+          tar -xzf gitleaks.tar.gz || { echo "Failed to extract GitLeaks"; exit 1; }
+          chmod +x gitleaks || true
 
       - name: Run GitLeaks
         run: |

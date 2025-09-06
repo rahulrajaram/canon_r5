@@ -14,13 +14,27 @@ obj-m += canon-r5-core.o
 obj-m += canon-r5-usb.o
 obj-m += canon-r5-video.o
 obj-m += canon-r5-still.o
-obj-m += canon-r5-audio.o
+###### Audio module conditional inclusion (auto-detect ALSA) ######
+ALSA_AUTO_CONF := $(KERNEL_DIR)/include/generated/autoconf.h
+ALSA_SYMVERS   := $(KERNEL_DIR)/Module.symvers
+# Safer detection using wildcard and simple greps only
+HAS_SND       := $(if $(wildcard $(ALSA_AUTO_CONF)),$(shell grep -q "^#define CONFIG_SND " $(ALSA_AUTO_CONF) && echo 1 || echo 0),0)
+HAS_SND_PCM   := $(if $(wildcard $(ALSA_AUTO_CONF)),$(shell grep -q "^#define CONFIG_SND_PCM " $(ALSA_AUTO_CONF) && echo 1 || echo 0),0)
+HAS_SND_SYMS  := $(if $(wildcard $(ALSA_SYMVERS)),$(shell grep -E "^(snd_ctl_add|snd_pcm_new)$$" $(ALSA_SYMVERS) >/dev/null && echo 1 || echo 0),0)
+
+ifeq ($(HAS_SND)$(HAS_SND_PCM),11)
+  obj-m += canon-r5-audio.o
+else ifeq ($(HAS_SND_SYMS),1)
+  obj-m += canon-r5-audio.o
+else
+  $(info Skipping canon-r5-audio: ALSA (SND/SND_PCM) not present in target kernel)
+endif
 obj-m += canon-r5-storage.o
 
 # Source file mappings
 canon-r5-core-objs := drivers/core/canon-r5-core.o drivers/core/canon-r5-ptp.o
 canon-r5-usb-objs := drivers/core/canon-r5-usb.o
-canon-r5-video-objs := drivers/video/canon-r5-video.o
+canon-r5-video-objs := drivers/video/canon-r5-v4l2.o drivers/video/canon-r5-videobuf2.o drivers/video/canon-r5-liveview.o
 canon-r5-still-objs := drivers/still/canon-r5-still.o
 canon-r5-audio-objs := drivers/audio/canon-r5-audio.o
 canon-r5-storage-objs := drivers/storage/canon-r5-storage.o drivers/storage/canon-r5-filesystem.o
@@ -46,26 +60,30 @@ all: modules
 modules:
 	@echo "Building Canon R5 Driver Suite v$(DRIVER_VERSION)"
 	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules
-	@echo "Organizing build artifacts..."
-	@$(PWD)/scripts/organize_build.sh
-	@echo "Build complete - modules available in build/modules/"
+	@echo "Build complete - modules built successfully"
 
 clean:
 	@echo "Cleaning build artifacts..."
-	# Use modules_clean to avoid writing inside system headers directory
-	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules_clean
-	@rm -rf build/
+	# Clean build artifacts without using unsupported modules_clean target
 	@rm -f *.ko *.mod *.mod.c *.o Module.symvers modules.order
-	@find . -name "*.cmd" -delete
-	@find . -name "*.o.d" -delete
-	@rm -rf .tmp_versions/
+	@find . -name "*.cmd" -delete 2>/dev/null || true
+	@find . -name "*.o.d" -delete 2>/dev/null || true
+	@rm -rf .tmp_versions/ 2>/dev/null || true
 	@echo "Clean complete"
 
 install: modules
 	@echo "Installing Canon R5 Driver Suite modules"
-	@echo "Copying modules from build/modules/ to system..."
+	@echo "Copying modules to system..."
 	@sudo mkdir -p /lib/modules/$(shell uname -r)/extra/
-	@sudo cp build/modules/*.ko /lib/modules/$(shell uname -r)/extra/
+	@if ls *.ko >/dev/null 2>&1; then \
+		echo "Using modules from repository root"; \
+		sudo cp *.ko /lib/modules/$(shell uname -r)/extra/; \
+	elif ls build/modules/*.ko >/dev/null 2>&1; then \
+		echo "Using modules from build/modules/"; \
+		sudo cp build/modules/*.ko /lib/modules/$(shell uname -r)/extra/; \
+	else \
+		echo "No modules found to install"; exit 1; \
+	fi
 	@echo "Running depmod to update module dependencies"
 	@sudo /sbin/depmod -a
 	@echo "Installation complete"
@@ -107,22 +125,22 @@ test: modules
 	
 	# Run integration tests
 	@if [ -f tests/integration/test_driver_loading.sh ]; then \
-		echo "🔧 Running driver loading tests..."; \
+		echo "Running driver loading tests..."; \
 		tests/integration/test_driver_loading.sh || echo "Driver loading tests completed with warnings"; \
 	fi
 	
 	@if [ -f tests/integration/test_dependencies.sh ]; then \
-		echo "🔗 Running dependency tests..."; \
+		echo "Running dependency tests..."; \
 		tests/integration/test_dependencies.sh || echo "Dependency tests completed with warnings"; \
 	fi
 	
 	# Run performance benchmarks
 	@if command -v python3 >/dev/null 2>&1; then \
-		echo "📊 Running performance benchmarks..."; \
+		echo "Running performance benchmarks..."; \
 		python3 tests/performance/benchmark.py --ci-mode || echo "Benchmarks completed with warnings"; \
 	fi
 	
-	@echo "✅ Test suite completed"
+	@echo "Test suite completed"
 
 security-check:
 	@echo "Running comprehensive security checks..."
@@ -135,10 +153,20 @@ security-check:
 			gitleaks detect --source . --config .gitleaks.toml --verbose; \
 		else \
 			echo "GitLeaks not installed - downloading..."; \
-			wget -O gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz; \
+			LATEST_URL=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+				| grep browser_download_url \
+				| grep -i linux \
+				| grep -Ei 'x64|x86_64|amd64' \
+				| grep -i tar.gz \
+				| head -n1 \
+				| cut -d '"' -f4); \
+			if [ -z "$LATEST_URL" ]; then \
+				echo "Failed to resolve latest GitLeaks asset URL"; exit 1; \
+			fi; \
+			wget -O gitleaks.tar.gz "$LATEST_URL"; \
 			tar -xzf gitleaks.tar.gz; \
 			./gitleaks detect --source . --config .gitleaks.toml --verbose; \
-			rm gitleaks gitleaks.tar.gz; \
+			rm -f gitleaks gitleaks.tar.gz; \
 		fi; \
 	fi
 	
@@ -247,6 +275,7 @@ help:
 	@echo "  unload-modules  - Unload all driver modules"
 	@echo ""
 	@echo "Development:"
+	@echo "  docker-ci      - Build inside Docker (Ubuntu 24.04)"
 	@echo "  test            - Run test suite"
 	@echo "  security-check  - Run security scans"
 	@echo "  style-check     - Check code style"

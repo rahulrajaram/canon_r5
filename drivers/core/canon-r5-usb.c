@@ -46,7 +46,8 @@ static const struct usb_device_id canon_r5_usb_id_table[] = {
 MODULE_DEVICE_TABLE(usb, canon_r5_usb_id_table);
 
 /* USB bulk transfer completion callback */
-static void canon_r5_usb_bulk_callback(struct urb *urb)
+/* Not currently used; keep as placeholder but annotate to avoid warnings */
+static void __maybe_unused canon_r5_usb_bulk_callback(struct urb *urb)
 {
 	struct canon_r5_device *dev = urb->context;
 	

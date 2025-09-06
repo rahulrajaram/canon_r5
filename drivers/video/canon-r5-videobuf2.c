@@ -26,8 +26,8 @@ static int canon_r5_vb2_queue_setup(struct vb2_queue *vq,
 	struct canon_r5_video_device *vdev = vb2_get_drv_priv(vq);
 	unsigned int size;
 	
-	if (vq->num_buffers + *nbuffers < 3) {
-		*nbuffers = 3 - vq->num_buffers;
+	if (*nbuffers < 3) {
+		*nbuffers = 3;
 	}
 	
 	if (*nbuffers > 8) {
@@ -285,7 +285,7 @@ int canon_r5_vb2_queue_init(struct canon_r5_video_device *vdev)
 	q->ops = &canon_r5_video_vb2_ops;
 	q->mem_ops = &vb2_vmalloc_memops;
 	q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
-	q->min_buffers_needed = 2;
+	/* min_buffers_needed field was removed in newer kernels */
 	q->lock = &vdev->lock;
 	q->dev = vdev->canon_dev->dev;
 	

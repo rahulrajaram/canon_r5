@@ -6,6 +6,8 @@ set -e
 
 SCRIPT_DIR="$(dirname "$0")"
 PROJECT_DIR="$SCRIPT_DIR/../.."
+ROOT_KO_DIR="$PROJECT_DIR"
+ALT_KO_DIR="$PROJECT_DIR/build/modules"
 
 echo "Canon R5 Driver Suite - Module Dependency Tests"
 echo "================================================"
@@ -46,7 +48,7 @@ check_modules_exist() {
     local missing_modules=0
     
     for module in canon-r5-core.ko canon-r5-usb.ko canon-r5-video.ko canon-r5-still.ko canon-r5-audio.ko canon-r5-storage.ko; do
-        if [ ! -f "$PROJECT_DIR/build/modules/$module" ]; then
+        if [ ! -f "$ROOT_KO_DIR/$module" ] && [ ! -f "$ALT_KO_DIR/$module" ]; then
             echo "❌ Missing module: $module"
             missing_modules=$((missing_modules + 1))
         else
@@ -62,7 +64,8 @@ test_module_info() {
     echo "Testing module information extraction..."
     local failed=0
     
-    for module in "$PROJECT_DIR"/build/modules/*.ko; do
+    shopt -s nullglob
+    for module in "$ROOT_KO_DIR"/*.ko "$ALT_KO_DIR"/*.ko; do
         echo "  Checking $(basename "$module")..."
         if ! modinfo "$module" >/dev/null 2>&1; then
             echo "    ❌ Failed to get module info"
@@ -99,7 +102,8 @@ test_depmod_resolution() {
     mkdir -p "$modules_dir"
     
     # Copy modules to temporary location
-    cp "$PROJECT_DIR"/build/modules/*.ko "$modules_dir/"
+    cp "$ROOT_KO_DIR"/*.ko "$modules_dir/" 2>/dev/null || true
+    cp "$ALT_KO_DIR"/*.ko "$modules_dir/" 2>/dev/null || true
     
     # Run depmod on temporary directory
     echo "  Running depmod analysis..."
@@ -133,7 +137,8 @@ test_circular_dependencies() {
     local modules_dir="$temp_dir/lib/modules/$(uname -r)/extra"
     
     mkdir -p "$modules_dir"
-    cp "$PROJECT_DIR"/build/modules/*.ko "$modules_dir/"
+    cp "$ROOT_KO_DIR"/*.ko "$modules_dir/" 2>/dev/null || true
+    cp "$ALT_KO_DIR"/*.ko "$modules_dir/" 2>/dev/null || true
     
     # Run depmod and capture output
     local depmod_output=$(depmod -b "$temp_dir" -F /dev/null $(uname -r) 2>&1)
@@ -161,7 +166,8 @@ test_symbol_exports() {
     echo "Testing module symbol exports..."
     local failed=0
     
-    for module in "$PROJECT_DIR"/build/modules/*.ko; do
+    shopt -s nullglob
+    for module in "$ROOT_KO_DIR"/*.ko "$ALT_KO_DIR"/*.ko; do
         local module_name=$(basename "$module" .ko)
         echo "  Checking symbols in $module_name..."
         
@@ -204,7 +210,7 @@ test_loading_order() {
     echo "  Verifying dependency chain:"
     
     # Core should have no dependencies
-    local core_deps=$(modinfo -F depends "$PROJECT_DIR/build/modules/canon-r5-core.ko" 2>/dev/null | tr ',' ' ')
+    local core_deps=$(modinfo -F depends "$ROOT_KO_DIR/canon-r5-core.ko" 2>/dev/null || modinfo -F depends "$ALT_KO_DIR/canon-r5-core.ko" 2>/dev/null | tr ',' ' ')
     if [ -z "$core_deps" ]; then
         echo "    ✅ canon-r5-core has no dependencies (correct)"
     else
@@ -213,7 +219,7 @@ test_loading_order() {
     fi
     
     # USB should depend on core
-    local usb_deps=$(modinfo -F depends "$PROJECT_DIR/build/modules/canon-r5-usb.ko" 2>/dev/null | tr ',' ' ')
+    local usb_deps=$(modinfo -F depends "$ROOT_KO_DIR/canon-r5-usb.ko" 2>/dev/null || modinfo -F depends "$ALT_KO_DIR/canon-r5-usb.ko" 2>/dev/null | tr ',' ' ')
     if echo "$usb_deps" | grep -q "canon.r5.core\|canon_r5_core"; then
         echo "    ✅ canon-r5-usb depends on canon-r5-core (correct)"
     else
@@ -230,7 +236,8 @@ test_version_consistency() {
     local versions=()
     local failed=0
     
-    for module in "$PROJECT_DIR"/build/modules/*.ko; do
+    shopt -s nullglob
+    for module in "$ROOT_KO_DIR"/*.ko "$ALT_KO_DIR"/*.ko; do
         local module_name=$(basename "$module" .ko)
         local version=$(modinfo -F version "$module" 2>/dev/null || echo "unknown")
         
@@ -258,13 +265,13 @@ test_version_consistency() {
 # Main test execution
 main() {
     echo "Starting Canon R5 module dependency tests..."
-    echo "Build directory: $PROJECT_DIR/build/modules"
+    echo "Module search paths: $ROOT_KO_DIR and $ALT_KO_DIR"
     echo "Kernel version: $(uname -r)"
     echo ""
     
     # Preliminary checks
-    if [ ! -d "$PROJECT_DIR/build/modules" ]; then
-        echo "❌ Build directory not found. Run 'make modules' first."
+    if ! ls "$ROOT_KO_DIR"/*.ko "$ALT_KO_DIR"/*.ko >/dev/null 2>&1; then
+        echo "❌ No built modules found. Run 'make modules' first."
         exit 1
     fi
     

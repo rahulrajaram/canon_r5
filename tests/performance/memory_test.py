@@ -16,8 +16,9 @@ from typing import Dict, List, Optional, Tuple
 class MemoryTester:
     """Memory testing utilities for Canon R5 driver modules"""
     
-    def __init__(self, build_dir: str = "build/modules"):
-        self.build_dir = Path(build_dir)
+    def __init__(self, build_dir: str = ""):
+        # Prefer repo root for *.ko; fall back to provided dir or build/modules
+        self.build_dir = Path(build_dir) if build_dir else Path("build/modules")
         self.modules = [
             "canon-r5-core.ko",
             "canon-r5-usb.ko", 
@@ -98,6 +99,9 @@ class MemoryTester:
         """Check if all required modules exist"""
         missing = []
         for module in self.modules:
+            # Check repo root first
+            if Path(module).exists():
+                continue
             if not (self.build_dir / module).exists():
                 missing.append(module)
         
@@ -110,7 +114,8 @@ class MemoryTester:
     
     def load_module(self, module_name: str) -> bool:
         """Load a kernel module and check for memory changes"""
-        module_path = self.build_dir / module_name
+        # Prefer root-path module if available
+        module_path = Path(module_name) if Path(module_name).exists() else (self.build_dir / module_name)
         
         try:
             print(f"  Loading {module_name}...")
@@ -379,8 +384,8 @@ def main():
     )
     parser.add_argument(
         "--build-dir", 
-        default="build/modules",
-        help="Directory containing built kernel modules"
+        default="",
+        help="Directory containing built kernel modules (defaults to repo root, then build/modules)"
     )
     parser.add_argument(
         "--cycles",

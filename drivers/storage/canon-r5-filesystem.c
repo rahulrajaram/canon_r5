@@ -21,6 +21,7 @@
 #include <linux/time.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/version.h>
 
 #include "../../include/core/canon-r5.h"
 #include "../../include/storage/canon-r5-storage.h"
@@ -60,10 +61,15 @@ static ssize_t canon_r5_fs_write(struct file *file, const char __user *buf, size
 static loff_t canon_r5_fs_file_llseek(struct file *file, loff_t offset, int whence);
 
 /* Inode operations forward declarations */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,3,0)
+#define CR5_IDMAP struct mnt_idmap
+#else
+#define CR5_IDMAP struct user_namespace
+#endif
 static struct dentry *canon_r5_fs_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags);
-static int canon_r5_fs_create(struct user_namespace *mnt_userns, struct inode *dir, struct dentry *dentry, umode_t mode, bool excl);
+static int canon_r5_fs_create(CR5_IDMAP *mnt_userns, struct inode *dir, struct dentry *dentry, umode_t mode, bool excl);
 static int canon_r5_fs_unlink(struct inode *dir, struct dentry *dentry);
-static int canon_r5_fs_mkdir(struct user_namespace *mnt_userns, struct inode *dir, struct dentry *dentry, umode_t mode);
+static int canon_r5_fs_mkdir(CR5_IDMAP *mnt_userns, struct inode *dir, struct dentry *dentry, umode_t mode);
 static int canon_r5_fs_rmdir(struct inode *dir, struct dentry *dentry);
 
 /* Address space operations forward declarations */
@@ -123,7 +129,9 @@ const struct file_operations canon_r5_storage_file_ops = {
 	.read		= canon_r5_fs_read,
 	.write		= canon_r5_fs_write,
 	.mmap		= generic_file_readonly_mmap,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,6,0)
 	.splice_read	= generic_file_splice_read,
+#endif
 };
 
 /* Address space operations */
@@ -375,9 +383,11 @@ static struct dentry *canon_r5_fs_lookup(struct inode *dir, struct dentry *dentr
 				
 				inode->i_ino = entry->object_handle;
 				inode->i_size = entry->size;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 				inode->i_mtime = ns_to_timespec64(ktime_to_ns(entry->mtime));
 				inode->i_atime = inode->i_mtime;
 				inode->i_ctime = inode->i_mtime;
+#endif
 				
 				if (entry->is_directory) {
 					inode->i_mode = S_IFDIR | 0755;
@@ -408,7 +418,7 @@ static struct dentry *canon_r5_fs_lookup(struct inode *dir, struct dentry *dentr
 	return d_splice_alias(inode, dentry);
 }
 
-static int canon_r5_fs_create(struct user_namespace *mnt_userns __attribute__((unused)), struct inode *dir __attribute__((unused)), struct dentry *dentry __attribute__((unused)), umode_t mode __attribute__((unused)), bool excl __attribute__((unused)))
+static int canon_r5_fs_create(CR5_IDMAP *mnt_userns __attribute__((unused)), struct inode *dir __attribute__((unused)), struct dentry *dentry __attribute__((unused)), umode_t mode __attribute__((unused)), bool excl __attribute__((unused)))
 {
 	/* File creation through PTP is complex and typically done by the camera */
 	return -EPERM;
@@ -427,7 +437,7 @@ static int canon_r5_fs_unlink(struct inode *dir __attribute__((unused)), struct 
 	return canon_r5_storage_delete_file(storage, info->file_obj);
 }
 
-static int canon_r5_fs_mkdir(struct user_namespace *mnt_userns __attribute__((unused)), struct inode *dir __attribute__((unused)), struct dentry *dentry __attribute__((unused)), umode_t mode __attribute__((unused)))
+static int canon_r5_fs_mkdir(CR5_IDMAP *mnt_userns __attribute__((unused)), struct inode *dir __attribute__((unused)), struct dentry *dentry __attribute__((unused)), umode_t mode __attribute__((unused)))
 {
 	/* Directory creation through PTP would need to be implemented */
 	return -EPERM;
@@ -587,7 +597,9 @@ static int canon_r5_fs_fill_super(struct super_block *sb, void *data, int silent
 	root_inode->i_mode = S_IFDIR | 0755;
 	root_inode->i_op = &canon_r5_storage_dir_inode_ops;
 	root_inode->i_fop = &canon_r5_storage_dir_file_ops;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 	root_inode->i_atime = root_inode->i_mtime = root_inode->i_ctime = current_time(root_inode);
+#endif
 	set_nlink(root_inode, 2);
 	
 	/* Set root object handle to 0 (root directory in PTP) */

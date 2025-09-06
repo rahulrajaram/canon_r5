@@ -56,12 +56,16 @@ test_module_dependencies() {
     local modules=("canon-r5-core.ko" "canon-r5-usb.ko" "canon-r5-video.ko" "canon-r5-still.ko" "canon-r5-audio.ko" "canon-r5-storage.ko")
     
     for module in "${modules[@]}"; do
-        # Check in new organized build directory
-        if [[ -f "$ROOT_DIR/build/modules/$module" ]]; then
+        local path=""
+        if [[ -f "$ROOT_DIR/$module" ]]; then
+            path="$ROOT_DIR/$module"
+        elif [[ -f "$ROOT_DIR/build/modules/$module" ]]; then
+            path="$ROOT_DIR/build/modules/$module"
+        fi
+
+        if [[ -n "$path" ]]; then
             log_info "✓ Found module: $module"
-            
-            # Check module info
-            local info=$(modinfo "$ROOT_DIR/build/modules/$module" 2>/dev/null)
+            local info=$(modinfo "$path" 2>/dev/null || true)
             if [[ -n "$info" ]]; then
                 log_info "  Module info available"
             else
