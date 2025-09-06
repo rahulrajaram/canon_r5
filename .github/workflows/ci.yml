@@ -8,7 +8,7 @@ on:
     branches: [ main ]
 
 env:
-  KBUILD_OUTPUT: build
+  # Avoid forcing KBUILD_OUTPUT; external module builds expect artifacts in-tree
 
 jobs:
   build-and-test:
@@ -79,7 +79,7 @@ jobs:
         make modules
         
         echo "Checking built modules..."
-        ls -la *.ko
+        ls -la *.ko || (echo "No modules found in root" && false)
         
         # Verify module info
         for module in *.ko; do
