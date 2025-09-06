@@ -129,25 +129,31 @@ jobs:
 
       - name: Install security tools
         run: |
-          # Install GitLeaks with dynamic URL resolution
+          set -euo pipefail
           echo "Resolving latest GitLeaks download URL..."
-          LATEST_URL=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
-            | grep browser_download_url \
-            | grep -i linux \
-            | grep -Ei 'x64|x86_64|amd64' \
-            | grep -i tar.gz \
-            | head -n1 \
-            | cut -d '"' -f4)
-          
-          if [ -z "$LATEST_URL" ]; then
-            echo "Failed to resolve latest GitLeaks asset URL"
-            exit 1
+          LATEST_URL=""
+          # Try GitHub API resolution
+          if command -v curl >/dev/null 2>&1; then
+            LATEST_URL=$(curl -fsSL https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+              | grep -E 'browser_download_url' \
+              | grep -Ei 'linux.*(x64|x86_64|amd64).*\.tar\.gz' \
+              | cut -d '"' -f4 \
+              | head -n1 || true)
           fi
-          
-          echo "Downloading GitLeaks from: $LATEST_URL"
-          wget -O gitleaks.tar.gz "$LATEST_URL"
-          tar -xzf gitleaks.tar.gz
-          chmod +x gitleaks
+          # Fallback to latest/download stable asset naming
+          if [ -z "$LATEST_URL" ]; then
+            # Map architecture (default to x64 on x86_64)
+            ARCH="x64"
+            if uname -m | grep -qiE 'aarch64|arm64'; then ARCH="arm64"; fi
+            LATEST_URL="https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_${ARCH}.tar.gz"
+            echo "Using fallback URL: $LATEST_URL"
+          else
+            echo "Resolved URL: $LATEST_URL"
+          fi
+          # Download and extract
+          wget -q -O gitleaks.tar.gz "$LATEST_URL" || { echo "Failed to download GitLeaks"; exit 1; }
+          tar -xzf gitleaks.tar.gz || { echo "Failed to extract GitLeaks"; exit 1; }
+          chmod +x gitleaks || true
 
       - name: Run GitLeaks
         run: |
