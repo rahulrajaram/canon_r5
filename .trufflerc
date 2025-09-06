@@ -1,0 +1,175 @@
+# TruffleHog configuration for Canon R5 Driver Suite
+# Comprehensive secret detection with custom rules and verification
+
+# Base configuration
+git = true
+github = false  # Set to true if scanning GitHub repos
+gitlab = false  # Set to true if scanning GitLab repos
+s3 = false
+gcs = false
+
+# Output configuration
+json = true
+only_verified = false  # Set to true to only show verified secrets
+print_avg_detector_time = false
+
+# Filtering
+include_detectors = [
+    "AWS",
+    "Azure", 
+    "GCP",
+    "GitHub",
+    "GitLab",
+    "Generic",
+    "PrivateKey",
+    "JWT",
+    "Slack",
+    "Mailgun",
+    "Sendgrid",
+    "Twilio",
+    "URI",
+    "Base64",
+    "Keyword"
+]
+
+# Custom detector configuration
+[detectors.custom]
+keywords = [
+    "canon_api_key",
+    "canon_secret",
+    "camera_password",
+    "firmware_key",
+    "device_serial",
+    "auth_token",
+    "access_key",
+    "secret_key",
+    "private_key",
+    "encryption_key",
+    "signing_key",
+    "certificate"
+]
+
+# Verification settings - enable for production scanning
+verify = true
+timeout = "10s"
+concurrency = 10
+
+# Path filtering
+include_paths = [
+    "drivers/",
+    "include/",
+    "scripts/",
+    "tests/",
+    "docs/",
+    ".github/"
+]
+
+exclude_paths = [
+    "build/",
+    "*.ko",
+    "*.o", 
+    "*.mod",
+    "*.symvers",
+    "*.order",
+    ".git/",
+    ".tmp_versions/",
+    "gitleaks",
+    "trufflehog"
+]
+
+# File type filtering
+include_extensions = [
+    ".c",
+    ".h", 
+    ".py",
+    ".sh",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".toml",
+    ".md",
+    ".txt"
+]
+
+exclude_extensions = [
+    ".ko",
+    ".o",
+    ".mod",
+    ".a",
+    ".so",
+    ".bin",
+    ".img"
+]
+
+# Archive scanning
+archive = false
+max_archive_size = "20MB"
+
+# Allowlist patterns (false positives)
+[allowlist]
+paths = [
+    "docs/examples/",
+    "tests/fixtures/",
+    "README.md",
+    "PROGRESS.md"
+]
+
+# Known false positive patterns
+regexes = [
+    # Standard kernel module patterns
+    'MODULE_LICENSE\("GPL.*"\)',
+    'MODULE_AUTHOR\(".*"\)',
+    'MODULE_DESCRIPTION\(".*"\)',
+    
+    # USB VID/PID constants (public Canon values) 
+    '#define CANON_USB_VID\s+0x04A9',
+    '#define CANON_R5_PID_\w+\s+0x[0-9A-Fa-f]{4}',
+    
+    # Standard USB endpoint addresses
+    '#define CANON_R5_EP_\w+\s+0x[0-9A-Fa-f]{2}',
+    
+    # Common kernel defines and magic numbers
+    '#define \w+_MAGIC\s+0x[0-9A-Fa-f]+',
+    
+    # Example/placeholder values
+    'example[_-]?(key|secret|token|password)',
+    'placeholder[_-]?(key|secret|token|password)',
+    'your[_-]?(api[_-]?key|secret|token|password)',
+    'dummy[_-]?(key|secret|token|password)',
+    'test[_-]?(key|secret|token|password)',
+    'fake[_-]?(key|secret|token|password)',
+    
+    # Documentation patterns
+    'INSERT[_-]?(YOUR|API)[_-]?(KEY|SECRET|TOKEN)',
+    'REPLACE[_-]?WITH[_-]?(YOUR|ACTUAL)[_-]?(KEY|SECRET|TOKEN)',
+    
+    # Git signatures (not secrets)
+    'Co-Authored-By:',
+    'Signed-off-by:',
+    
+    # Base64 encoded strings that are not secrets
+    'data:image/[^;]+;base64,',
+    
+    # Common hash patterns that are not secrets
+    'sha256:[a-f0-9]{64}',
+    'md5:[a-f0-9]{32}',
+    
+    # Version strings and checksums
+    'version[_-]?[0-9]+\.[0-9]+\.[0-9]+',
+    'checksum[_-]?[a-f0-9]+',
+    
+    # Standard kernel symbol CRCs (from .mod.c files)
+    'SYMBOL_CRC\([^,]+,\s*0x[0-9a-f]+,\s*"[^"]*"\)'
+]
+
+# Commit range scanning
+since = ""  # Leave empty for full history
+until = ""  # Leave empty for HEAD
+
+# Branch filtering
+branch = ""  # Leave empty for current branch
+all_branches = false  # Set to true to scan all branches
+
+# Performance tuning
+max_depth = 1000000  # Max commit depth
+no_update = false    # Skip detector updates

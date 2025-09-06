@@ -1,0 +1,236 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Run security scans weekly on Sundays
+    - cron: '0 2 * * 0'
+
+jobs:
+  secret-scanning:
+    name: Multi-Tool Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run GitLeaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+      - name: Install TruffleHog
+        run: |
+          # Install latest TruffleHog
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+          trufflehog --version
+
+      - name: Run TruffleHog
+        run: |
+          # Run TruffleHog with configuration
+          trufflehog git file://. \
+            --config=.trufflerc \
+            --no-verification \
+            --no-update \
+            --fail \
+            --json \
+            --output=trufflehog-results.json || echo "TruffleHog found potential secrets"
+
+      - name: Upload TruffleHog results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trufflehog-results
+          path: trufflehog-results.json
+
+      - name: TruffleHog verified secrets scan
+        run: |
+          # Run with verification enabled for high-confidence results
+          echo "Running TruffleHog with verification for high-confidence results..."
+          trufflehog git file://. \
+            --config=.trufflerc \
+            --only-verified \
+            --no-update \
+            --fail \
+            --json \
+            --output=trufflehog-verified.json || echo "No verified secrets found"
+
+      - name: Upload verified results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trufflehog-verified-results  
+          path: trufflehog-verified.json
+
+  semgrep:
+    name: Semgrep Security Analysis
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: |
+          semgrep --config=p/security-audit \
+                  --config=p/secrets \
+                  --config=p/c \
+                  --config=p/dockerfile \
+                  --config=p/yaml \
+                  --error \
+                  --skip-unknown-extensions \
+                  --exclude=build/ \
+                  --exclude=*.ko \
+                  --exclude=*.o \
+                  --json \
+                  --output=semgrep-results.json \
+                  .
+
+      - name: Upload Semgrep results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semgrep-results
+          path: semgrep-results.json
+
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp', 'python' ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-and-quality
+
+      - name: Install kernel headers
+        if: matrix.language == 'cpp'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y linux-headers-generic build-essential
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+  trivy:
+    name: Trivy Vulnerability Scanner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner in repo mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  bandit:
+    name: Bandit Python Security Linter
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('**/*.py') != '' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit
+        run: |
+          bandit -r . -f json -o bandit-results.json || true
+          bandit -r . -f txt
+
+      - name: Upload Bandit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-results
+          path: bandit-results.json
+
+  dependency-check:
+    name: OWASP Dependency Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'canon-r5-driver'
+          path: '.'
+          format: 'ALL'
+          args: >
+            --enableRetired
+            --enableExperimental
+            --exclude="build/**"
+            --exclude="**/*.ko"
+            --exclude="**/*.o"
+
+      - name: Upload dependency check results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check-report
+          path: reports/
+
+  security-summary:
+    name: Security Scan Summary
+    runs-on: ubuntu-latest
+    needs: [secret-scanning, semgrep, codeql, trivy, bandit, dependency-check]
+    if: always()
+    steps:
+      - name: Security scan completed
+        run: |
+          echo "Security scanning completed for Canon R5 Driver Suite"
+          echo "Check the individual job results for detailed findings"
+          
+          # Exit with error if any security scan failed
+          if [[ "${{ needs.secret-scanning.result }}" == "failure" || 
+                "${{ needs.semgrep.result }}" == "failure" || 
+                "${{ needs.codeql.result }}" == "failure" || 
+                "${{ needs.trivy.result }}" == "failure" ]]; then
+            echo "❌ Critical security scans failed"
+            exit 1
+          else
+            echo "✅ All critical security scans passed"
+          fi

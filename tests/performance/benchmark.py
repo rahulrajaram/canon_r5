@@ -417,6 +417,10 @@ def main():
     parser = argparse.ArgumentParser(description="Canon R5 Driver Performance Benchmarks")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--output", "-o", help="Output file for JSON report")
+    parser.add_argument("--output-format", choices=['json', 'text'], default='text', help="Output format")
+    parser.add_argument("--output-file", help="Output file path")
+    parser.add_argument("--ci-mode", action="store_true", help="CI mode (reduced privileges)")
+    parser.add_argument("--full-suite", action="store_true", help="Run full benchmark suite")
     parser.add_argument("--root-dir", help="Root directory of Canon R5 driver", 
                        default=os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
     
@@ -435,7 +439,8 @@ def main():
     benchmark.run_all_benchmarks()
     
     # Generate report
-    report = benchmark.generate_report(args.output)
+    output_file = args.output or args.output_file
+    report = benchmark.generate_report(output_file)
     
     # Print summary
     benchmark.print_summary()

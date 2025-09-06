@@ -1,0 +1,109 @@
+# Canon R5 Driver Suite - clang-format configuration
+# Based on Linux kernel coding style
+
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 8
+UseTab: Always
+TabWidth: 8
+IndentCaseLabels: false
+IndentGotoLabels: false
+
+# Line length
+ColumnLimit: 100
+ReflowComments: false
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Left
+AlignOperands: true
+AlignTrailingComments: false
+
+# Braces
+BreakBeforeBraces: Linux
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: true
+  AfterNamespace: false
+  AfterObjCDeclaration: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+
+# Spacing
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInContainerLiterals: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Line breaking
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: false
+BinPackArguments: true
+BinPackParameters: true
+BreakAfterJavaFieldAnnotations: false
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: false
+BreakConstructorInitializers: BeforeColon
+BreakStringLiterals: false
+ContinuationIndentWidth: 8
+
+# Sorting
+SortIncludes: false  # Kernel has specific include order requirements
+
+# Penalties (for algorithm tuning)
+PenaltyBreakAssignment: 10
+PenaltyBreakBeforeFirstCallParameter: 30
+PenaltyBreakComment: 10
+PenaltyBreakFirstLessLess: 0
+PenaltyBreakString: 10
+PenaltyExcessCharacter: 100
+PenaltyReturnTypeOnItsOwnLine: 60
+
+# Comments
+CommentPragmas: '^ IWYU pragma:'
+
+# Macros that should be interpreted as foreach loops
+ForEachMacros:
+  - 'list_for_each'
+  - 'list_for_each_entry'
+  - 'list_for_each_entry_safe'
+  - 'list_for_each_safe'
+  - 'for_each_set_bit'
+  - 'hash_for_each'
+  - 'hash_for_each_safe'
+
+# Include categories (Linux kernel style)
+IncludeCategories:
+  - Regex: '^<linux/'
+    Priority: 1
+  - Regex: '^<asm/'
+    Priority: 2
+  - Regex: '^<.*\.h>'
+    Priority: 3
+  - Regex: '^".*"'
+    Priority: 4

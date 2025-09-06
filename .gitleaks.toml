@@ -1,0 +1,96 @@
+# GitLeaks configuration for Canon R5 Driver Suite
+# Prevents accidental commit of secrets, API keys, passwords, etc.
+# Used in conjunction with TruffleHog for comprehensive secret detection
+
+title = "Canon R5 Driver Suite - GitLeaks Security Configuration"
+
+[extend]
+# Use GitLeaks default rules as base
+useDefault = true
+
+[[rules]]
+description = "Canon API Keys"
+id = "canon-api-key"
+regex = '''(?i)(canon[_-]?api[_-]?key|canon[_-]?secret)['":\s=]*([0-9a-f]{32,64})'''
+secretGroup = 2
+
+[[rules]]
+description = "USB Device Serial Numbers"
+id = "usb-serial"
+regex = '''(?i)(serial[_-]?number|device[_-]?serial)['":\s=]*([A-Z0-9]{8,32})'''
+secretGroup = 2
+
+[[rules]]
+description = "Camera Credentials"
+id = "camera-credentials"
+regex = '''(?i)(camera[_-]?pass|cam[_-]?password|auth[_-]?token)['":\s=]*([A-Za-z0-9+/]{16,})'''
+secretGroup = 2
+
+[[rules]]
+description = "Firmware Keys"
+id = "firmware-key"
+regex = '''(?i)(firmware[_-]?key|fw[_-]?secret|encryption[_-]?key)['":\s=]*([0-9a-fA-F]{32,128})'''
+secretGroup = 2
+
+[[rules]]
+description = "Development Certificates"
+id = "dev-cert"
+regex = '''-----BEGIN (PRIVATE KEY|RSA PRIVATE KEY|CERTIFICATE)-----'''
+
+[[rules]]
+description = "Generic Passwords"
+id = "generic-password"
+regex = '''(?i)(password|passwd|pwd)['":\s=]*([A-Za-z0-9!@#$%^&*]{8,})'''
+secretGroup = 2
+
+[[rules]]
+description = "Test API Endpoints with Auth"
+id = "test-endpoints"
+regex = '''https?://[^/]*\.(canon|test|dev|staging)\.[^/]*(/.*)?(\?|&)(api_key|auth_token|access_token)=([A-Za-z0-9+/]{16,})'''
+secretGroup = 5
+
+# Allowlist patterns - these won't be flagged as secrets
+[allowlist]
+description = "Allowlisted patterns"
+regexes = [
+    # Standard kernel module patterns
+    '''MODULE_LICENSE\("GPL.*"\)''',
+    '''MODULE_AUTHOR\(".*"\)''',
+    '''MODULE_DESCRIPTION\(".*"\)''',
+    
+    # USB VID/PID constants (public Canon values)
+    '''#define CANON_USB_VID\s+0x04A9''',
+    '''#define CANON_R5_PID_\w+\s+0x[0-9A-Fa-f]{4}''',
+    
+    # Standard USB endpoint addresses
+    '''#define CANON_R5_EP_\w+\s+0x[0-9A-Fa-f]{2}''',
+    
+    # Common kernel defines and magic numbers
+    '''#define \w+_MAGIC\s+0x[0-9A-Fa-f]+''',
+    
+    # Example/placeholder values in documentation
+    '''example[_-]?key''',
+    '''placeholder[_-]?secret''',
+    '''your[_-]?api[_-]?key''',
+    '''dummy[_-]?password''',
+    
+    # Git commit signatures (not secrets)
+    '''Co-Authored-By:''',
+    '''Signed-off-by:''',
+]
+
+paths = [
+    # Don't scan these paths
+    '''build/.*''',
+    '''\.git/.*''',
+    '''\.github/workflows/.*''', # CI secrets are encrypted
+]
+
+# Files to ignore completely
+files = [
+    '''\.ko$''',     # Compiled kernel modules
+    '''\.o$''',      # Object files
+    '''\.mod$''',    # Module files
+    '''\.symvers$''', # Symbol version files
+    '''\.order$''',  # Module order files
+]

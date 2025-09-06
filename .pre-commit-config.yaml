@@ -1,0 +1,131 @@
+# Pre-commit hooks for Canon R5 Driver Suite
+# Ensures code quality and security before commits
+
+repos:
+  # GitLeaks - Secret scanning
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+
+  # TruffleHog - Enhanced secret detection
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.63.2
+    hooks:
+      - id: trufflehog
+        name: TruffleHog Secret Scanner
+        entry: trufflehog
+        language: system
+        stages: [commit]
+        args: 
+          - 'git'
+          - 'file://.'
+          - '--config=.trufflerc'
+          - '--no-verification'
+          - '--no-update'
+          - '--fail'
+        pass_filenames: false
+
+  # Basic file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.patch$'
+      - id: end-of-file-fixer
+        exclude: '(\.ko|\.o|\.mod|\.symvers|\.order)$'
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=1024']  # Limit files to 1MB
+      - id: detect-private-key
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # Kernel code style checking
+  - repo: local
+    hooks:
+      - id: checkpatch
+        name: Linux Kernel checkpatch.pl
+        entry: scripts/checkpatch.pl
+        language: script
+        files: '\.(c|h)$'
+        exclude: '^(build/|tests/)'
+        args: ['--no-tree', '--file', '--strict', '--max-line-length=100']
+        require_serial: false
+        pass_filenames: true
+
+  # C/C++ formatting and linting
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v17.0.6
+    hooks:
+      - id: clang-format
+        files: '\.(c|h)$'
+        exclude: '^(build/|include/uapi/)'
+        args: ['-style=file', '-i']
+
+  # Security scanning with Semgrep
+  - repo: https://github.com/semgrep/semgrep
+    rev: v1.45.0
+    hooks:
+      - id: semgrep
+        args: 
+          - '--config=p/security-audit'
+          - '--config=p/secrets'
+          - '--config=p/c'
+          - '--error'
+          - '--skip-unknown-extensions'
+          - '--exclude=build/'
+          - '--exclude=*.ko'
+          - '--exclude=*.o'
+        files: '\.(c|h|py|sh|yaml|yml|json)$'
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        args: ['-e', 'SC1091', '-e', 'SC2034']
+
+  # Python linting (for build scripts)
+  - repo: https://github.com/psf/black
+    rev: 23.11.0
+    hooks:
+      - id: black
+        files: '\.py$'
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        files: '\.py$'
+        args: ['--max-line-length=88', '--extend-ignore=E203,W503']
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.37.0
+    hooks:
+      - id: markdownlint
+        args: ['--fix', '--disable=MD013,MD033,MD041']
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        args: ['-d', '{extends: relaxed, rules: {line-length: {max: 120}}}']
+
+# Configuration
+ci:
+  autofix_prs: true
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+    
+    for more information, see https://pre-commit.ci
+  autoupdate_branch: 'main'
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [checkpatch]  # Skip kernel checkpatch in CI (requires kernel source)

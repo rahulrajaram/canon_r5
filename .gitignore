@@ -1,61 +1,123 @@
-# Canon R5 Driver Suite .gitignore
-# Build artifacts and temporary files
-
 # Kernel module build artifacts
 *.ko
-*.o
 *.mod
 *.mod.c
-*.mod.o
-*.cmd
-.tmp_versions/
-Module.symvers
-modules.order
-
-# Object files and dependency files
 *.o
-*.d
+*.o.d
+*.cmd
+*.symvers
+*.order
+*.markers
+Module.markers
+modules.builtin
+.tmp_versions/
 
-# Debug and log files
-debug/
-logs/
-*.log
+# Build directories
+build/
+out/
 
-# Temporary files
+# Editor files
 *~
 *.swp
 *.swo
-.*.tmp
-
-# IDE files
 .vscode/
-*.pro.user
+.idea/
+*.kate-swp
+.*.swp
 
-# Compiled Python files
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git files
+*.orig
+*.rej
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Security scanning results
+gitleaks-report.json
+trufflehog-results.json
+trufflehog-verified.json
+bandit-results.json
+semgrep-results.json
+trivy-results.sarif
+
+# Development tools
+.pre-commit-cache/
+.pytest_cache/
 __pycache__/
 *.pyc
 *.pyo
 
-# Build directory (organized build artifacts)
-build/
-
-# Testing artifacts
-test_results/
-coverage/
-
-# Distribution packages
-dist/
-*.tar.gz
-*.zip
-
 # Documentation build
-docs/html/
-docs/latex/
+docs/_build/
+docs/build/
 
-# USB capture files
-*.pcap
-usb_trace*
+# Test results
+test-results/
+coverage/
+*.coverage
 
 # Backup files
 *.bak
-*.orig
+*.backup
+
+# Package files
+*.rpm
+*.deb
+*.tar.gz
+*.tar.xz
+*.zip
+
+# IDE project files
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.moc
+*.moc.cpp
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qmlc
+*.jsc
+
+# Profiling data
+*.prof
+
+# Core dumps
+core
+core.*
+
+# Downloaded dependencies
+scripts/kernel-checkpatch.pl
+gitleaks
+gitleaks.tar.gz
+trufflehog
+
+# Certificates and keys (security)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Local configuration
+local_config.h
+local_settings.h
