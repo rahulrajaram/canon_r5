@@ -10,7 +10,7 @@ on:
     - cron: '0 3 * * *'
 
 env:
-  KBUILD_OUTPUT: build
+  # Do not force KBUILD_OUTPUT; external module builds write *.ko in-tree
 
 jobs:
   unit-tests:
@@ -79,10 +79,10 @@ jobs:
           make DEBUG=1 modules
           
           echo "Verifying built modules..."
-          ls -la build/modules/*.ko
+          ls -la *.ko
           
           # Basic module validation
-          for module in build/modules/*.ko; do
+          for module in *.ko; do
             echo "Checking module: $module"
             modinfo "$module" || echo "Warning: Could not get module info for $module"
           done
@@ -219,7 +219,7 @@ jobs:
           echo "Building optimized modules for performance testing..."
           make clean
           make modules
-          ls -la build/modules/
+          ls -la *.ko || true
 
       - name: Run performance benchmarks
         run: |
@@ -287,10 +287,10 @@ jobs:
           make CC=${{ matrix.compiler }} modules
           
           echo "Verifying modules were built..."
-          ls -la build/modules/*.ko
+          ls -la *.ko
           
           # Test module information
-          for module in build/modules/*.ko; do
+          for module in *.ko; do
             modinfo "$module" || echo "Warning: modinfo failed for $module"
           done
 
@@ -317,7 +317,7 @@ jobs:
           name: compiler-results-${{ matrix.compiler }}
           path: |
             compiler-warnings.log
-            build/modules/
+            *.ko
           retention-days: 7
 
   static-analysis-tests:
