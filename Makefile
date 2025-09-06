@@ -52,7 +52,8 @@ modules:
 
 clean:
 	@echo "Cleaning build artifacts..."
-	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) clean
+	# Use modules_clean to avoid writing inside system headers directory
+	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules_clean
 	@rm -rf build/
 	@rm -f *.ko *.mod *.mod.c *.o Module.symvers modules.order
 	@find . -name "*.cmd" -delete
