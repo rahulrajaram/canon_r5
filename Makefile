@@ -59,9 +59,17 @@ clean:
 
 install: modules
 	@echo "Installing Canon R5 Driver Suite modules"
-	@echo "Copying modules from build/modules/ to system..."
+	@echo "Copying modules to system..."
 	@sudo mkdir -p /lib/modules/$(shell uname -r)/extra/
-	@sudo cp build/modules/*.ko /lib/modules/$(shell uname -r)/extra/
+	@if ls *.ko >/dev/null 2>&1; then \
+		echo "Using modules from repository root"; \
+		sudo cp *.ko /lib/modules/$(shell uname -r)/extra/; \
+	elif ls build/modules/*.ko >/dev/null 2>&1; then \
+		echo "Using modules from build/modules/"; \
+		sudo cp build/modules/*.ko /lib/modules/$(shell uname -r)/extra/; \
+	else \
+		echo "No modules found to install"; exit 1; \
+	fi
 	@echo "Running depmod to update module dependencies"
 	@sudo /sbin/depmod -a
 	@echo "Installation complete"
