@@ -53,13 +53,12 @@ modules:
 
 clean:
 	@echo "Cleaning build artifacts..."
-	# Use modules_clean to avoid writing inside system headers directory
-	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules_clean
+	# Clean build artifacts without using unsupported modules_clean target
 	@rm -rf build/
 	@rm -f *.ko *.mod *.mod.c *.o Module.symvers modules.order
-	@find . -name "*.cmd" -delete
-	@find . -name "*.o.d" -delete
-	@rm -rf .tmp_versions/
+	@find . -name "*.cmd" -delete 2>/dev/null || true
+	@find . -name "*.o.d" -delete 2>/dev/null || true
+	@rm -rf .tmp_versions/ 2>/dev/null || true
 	@echo "Clean complete"
 
 install: modules
