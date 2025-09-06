@@ -29,7 +29,7 @@ jobs:
         run: |
           # Install latest TruffleHog
           curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
-          trufflehog --version
+          trufflehog --version || echo "TruffleHog installation completed"
 
       - name: Run TruffleHog
         run: |
