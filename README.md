@@ -332,3 +332,27 @@ make test
 GPL v2 - See [LICENSE](LICENSE) file for details.
 
 This project is not affiliated with Canon Inc. Canon and EOS are trademarks of Canon Inc.
+## Development
+
+### Run CI-like build in Docker
+
+You can reproduce the GitHub Actions build locally using Docker (no kernel module loading). This compiles against headers available in the container (tries `linux-headers-generic`). The container kernel may not match your host kernel; this is fine for catching most compile issues.
+
+1. Build the image (optionally select a headers package):
+
+   - Default (generic headers):
+     docker build -f docker/Dockerfile.ci -t canon-r5-ci .
+
+   - Try a specific headers package (if available in Ubuntu repos):
+     docker build --build-arg KERNEL_HEADERS_PKG=linux-headers-6.11.0-1018-azure -f docker/Dockerfile.ci -t canon-r5-ci:6.11 . || \\
+     docker build --build-arg KERNEL_HEADERS_PKG=linux-headers-6.11.0-1018 -f docker/Dockerfile.ci -t canon-r5-ci:6.11 . || true
+
+2. Run the CI script inside the container:
+
+   docker run --rm -t -v "$PWD":/workspace -w /workspace canon-r5-ci
+
+This will:
+- install build deps + headers, build modules, run modinfo where possible
+- run the non-privileged parts of the integration tests
+
+Note: Loading kernel modules is not supported inside this container without additional privileges; the goal here is to reproduce CI compile issues quickly.

@@ -261,6 +261,7 @@ help:
 	@echo "  unload-modules  - Unload all driver modules"
 	@echo ""
 	@echo "Development:"
+	@echo "  docker-ci      - Build inside Docker (Ubuntu 24.04)"
 	@echo "  test            - Run test suite"
 	@echo "  security-check  - Run security scans"
 	@echo "  style-check     - Check code style"
