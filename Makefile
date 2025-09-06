@@ -17,9 +17,10 @@ obj-m += canon-r5-still.o
 ###### Audio module conditional inclusion (auto-detect ALSA) ######
 ALSA_AUTO_CONF := $(KERNEL_DIR)/include/generated/autoconf.h
 ALSA_SYMVERS   := $(KERNEL_DIR)/Module.symvers
-HAS_SND       := $(shell [ -f $(ALSA_AUTO_CONF) ] && grep -q '^#define CONFIG_SND ' $(ALSA_AUTO_CONF) && echo 1 || echo 0)
-HAS_SND_PCM   := $(shell [ -f $(ALSA_AUTO_CONF) ] && grep -q '^#define CONFIG_SND_PCM ' $(ALSA_AUTO_CONF) && echo 1 || echo 0)
-HAS_SND_SYMS  := $(shell [ -f $(ALSA_SYMVERS) ] && awk '{print $$2}' $(ALSA_SYMVERS) | grep -E '^(snd_ctl_add|snd_pcm_new)$' >/dev/null && echo 1 || echo 0)
+# Safer detection using wildcard and simple greps only
+HAS_SND       := $(if $(wildcard $(ALSA_AUTO_CONF)),$(shell grep -q "^#define CONFIG_SND " $(ALSA_AUTO_CONF) && echo 1 || echo 0),0)
+HAS_SND_PCM   := $(if $(wildcard $(ALSA_AUTO_CONF)),$(shell grep -q "^#define CONFIG_SND_PCM " $(ALSA_AUTO_CONF) && echo 1 || echo 0),0)
+HAS_SND_SYMS  := $(if $(wildcard $(ALSA_SYMVERS)),$(shell grep -E "^(snd_ctl_add|snd_pcm_new)$$" $(ALSA_SYMVERS) >/dev/null && echo 1 || echo 0),0)
 
 ifeq ($(HAS_SND)$(HAS_SND_PCM),11)
   obj-m += canon-r5-audio.o
@@ -124,22 +125,22 @@ test: modules
 	
 	# Run integration tests
 	@if [ -f tests/integration/test_driver_loading.sh ]; then \
-		echo "🔧 Running driver loading tests..."; \
+		echo "Running driver loading tests..."; \
 		tests/integration/test_driver_loading.sh || echo "Driver loading tests completed with warnings"; \
 	fi
 	
 	@if [ -f tests/integration/test_dependencies.sh ]; then \
-		echo "🔗 Running dependency tests..."; \
+		echo "Running dependency tests..."; \
 		tests/integration/test_dependencies.sh || echo "Dependency tests completed with warnings"; \
 	fi
 	
 	# Run performance benchmarks
 	@if command -v python3 >/dev/null 2>&1; then \
-		echo "📊 Running performance benchmarks..."; \
+		echo "Running performance benchmarks..."; \
 		python3 tests/performance/benchmark.py --ci-mode || echo "Benchmarks completed with warnings"; \
 	fi
 	
-	@echo "✅ Test suite completed"
+	@echo "Test suite completed"
 
 security-check:
 	@echo "Running comprehensive security checks..."
