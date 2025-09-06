@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config CANON_R5_KUNIT_TEST
+	tristate "Canon R5 Driver KUnit Tests"
+	depends on KUNIT
+	help
+	  This builds unit tests for the Canon R5 driver suite using KUnit.
+	  
+	  KUnit tests run during boot and output results to the debug log.
+	  
+	  For more information on KUnit and unit tests in general please refer
+	  to the KUnit documentation in Documentation/dev-tools/kunit/.
+	  
+	  If unsure, say N.
+
+config CANON_R5_CORE_KUNIT_TEST
+	tristate "Canon R5 Core Driver KUnit Tests"
+	depends on CANON_R5_KUNIT_TEST
+	help
+	  This builds unit tests for the Canon R5 core driver functions.
+
+config CANON_R5_PTP_KUNIT_TEST
+	tristate "Canon R5 PTP Protocol KUnit Tests"
+	depends on CANON_R5_KUNIT_TEST
+	help
+	  This builds unit tests for the Canon R5 PTP protocol implementation.
+
+config CANON_R5_STORAGE_KUNIT_TEST
+	tristate "Canon R5 Storage Driver KUnit Tests"
+	depends on CANON_R5_KUNIT_TEST
+	help
+	  This builds unit tests for the Canon R5 storage and filesystem driver.
+
+config CANON_R5_AUDIO_KUNIT_TEST
+	tristate "Canon R5 Audio Driver KUnit Tests"
+	depends on CANON_R5_KUNIT_TEST
+	help
+	  This builds unit tests for the Canon R5 ALSA audio driver.
+
+config CANON_R5_VIDEO_KUNIT_TEST
+	tristate "Canon R5 Video Driver KUnit Tests"
+	depends on CANON_R5_KUNIT_TEST
+	help
+	  This builds unit tests for the Canon R5 V4L2 video driver.

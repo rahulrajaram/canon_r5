@@ -17,10 +17,25 @@
 #include "../../include/core/canon-r5.h"
 #include "../../include/core/canon-r5-ptp.h"
 
+/* USB transport layer structure */
+struct canon_r5_usb {
+	struct usb_device	*udev;
+	struct usb_interface	*intf;
+	struct usb_endpoint_descriptor *ep_int_in;
+	struct usb_endpoint_descriptor *ep_bulk_in;
+	struct usb_endpoint_descriptor *ep_bulk_out;
+	struct urb		*int_urb;
+	u8			*int_buffer;
+	size_t			max_packet_size;
+};
+
 MODULE_AUTHOR("Canon R5 Driver Project");
 MODULE_DESCRIPTION("Canon R5 Camera Driver Suite - USB Transport");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION(CANON_R5_DRIVER_VERSION);
+MODULE_SOFTDEP("pre: canon-r5-core");
+
+/* Forward declarations for USB transport functions */
 
 /* USB device table - PIDs will be updated when actual device is analyzed */
 static const struct usb_device_id canon_r5_usb_id_table[] = {
@@ -63,7 +78,7 @@ static void canon_r5_usb_bulk_callback(struct urb *urb)
 		break;
 	case -EPIPE:
 		canon_r5_warn(dev, "USB endpoint stalled in bulk transfer");
-		usb_clear_halt(dev->usb.udev, urb->pipe);
+		usb_clear_halt(dev->usb->udev, urb->pipe);
 		break;
 	default:
 		canon_r5_err(dev, "USB bulk transfer failed with error %d", urb->status);
@@ -107,7 +122,7 @@ static void canon_r5_usb_int_callback(struct urb *urb)
 		break;
 	case -EPIPE:
 		canon_r5_warn(dev, "USB endpoint stalled in interrupt transfer");
-		usb_clear_halt(dev->usb.udev, urb->pipe);
+		usb_clear_halt(dev->usb->udev, urb->pipe);
 		break;
 	default:
 		canon_r5_err(dev, "USB interrupt transfer failed with error %d", urb->status);
@@ -126,7 +141,7 @@ static void canon_r5_usb_int_callback(struct urb *urb)
 /* Initialize USB endpoints and URBs */
 static int canon_r5_usb_init_endpoints(struct canon_r5_device *dev)
 {
-	struct usb_interface *intf = dev->usb.intf;
+	struct usb_interface *intf = dev->usb->intf;
 	struct usb_host_interface *alt_setting;
 	struct usb_endpoint_descriptor *ep_desc;
 	int i, ret;
@@ -139,65 +154,65 @@ static int canon_r5_usb_init_endpoints(struct canon_r5_device *dev)
 		
 		if (usb_endpoint_is_int_in(ep_desc) &&
 		    ep_desc->bEndpointAddress == CANON_R5_EP_INT_IN) {
-			dev->usb.ep_int_in = ep_desc;
+			dev->usb->ep_int_in = ep_desc;
 			canon_r5_dbg(dev, "Found interrupt IN endpoint: 0x%02x",
 				    ep_desc->bEndpointAddress);
 		} else if (usb_endpoint_is_bulk_in(ep_desc) &&
 			   ep_desc->bEndpointAddress == CANON_R5_EP_BULK_IN) {
-			dev->usb.ep_bulk_in = ep_desc;
+			dev->usb->ep_bulk_in = ep_desc;
 			canon_r5_dbg(dev, "Found bulk IN endpoint: 0x%02x",
 				    ep_desc->bEndpointAddress);
 		} else if (usb_endpoint_is_bulk_out(ep_desc) &&
 			   ep_desc->bEndpointAddress == CANON_R5_EP_BULK_OUT) {
-			dev->usb.ep_bulk_out = ep_desc;
+			dev->usb->ep_bulk_out = ep_desc;
 			canon_r5_dbg(dev, "Found bulk OUT endpoint: 0x%02x",
 				    ep_desc->bEndpointAddress);
 		}
 	}
 	
 	/* Verify we found all required endpoints */
-	if (!dev->usb.ep_int_in || !dev->usb.ep_bulk_in || !dev->usb.ep_bulk_out) {
+	if (!dev->usb->ep_int_in || !dev->usb->ep_bulk_in || !dev->usb->ep_bulk_out) {
 		canon_r5_err(dev, "Missing required USB endpoints");
 		return -ENODEV;
 	}
 	
 	/* Calculate max packet size */
-	dev->usb.max_packet_size = max_t(size_t,
-					usb_endpoint_maxp(dev->usb.ep_bulk_in),
-					usb_endpoint_maxp(dev->usb.ep_bulk_out));
+	dev->usb->max_packet_size = max_t(size_t,
+					usb_endpoint_maxp(dev->usb->ep_bulk_in),
+					usb_endpoint_maxp(dev->usb->ep_bulk_out));
 	
 	canon_r5_info(dev, "USB endpoints initialized, max packet size: %zu",
-		     dev->usb.max_packet_size);
+		     dev->usb->max_packet_size);
 	
 	/* Allocate interrupt URB and buffer */
-	dev->usb.int_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!dev->usb.int_urb) {
+	dev->usb->int_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!dev->usb->int_urb) {
 		canon_r5_err(dev, "Failed to allocate interrupt URB");
 		return -ENOMEM;
 	}
 	
-	dev->usb.int_buffer = kmalloc(usb_endpoint_maxp(dev->usb.ep_int_in), GFP_KERNEL);
-	if (!dev->usb.int_buffer) {
+	dev->usb->int_buffer = kmalloc(usb_endpoint_maxp(dev->usb->ep_int_in), GFP_KERNEL);
+	if (!dev->usb->int_buffer) {
 		canon_r5_err(dev, "Failed to allocate interrupt buffer");
-		usb_free_urb(dev->usb.int_urb);
-		dev->usb.int_urb = NULL;
+		usb_free_urb(dev->usb->int_urb);
+		dev->usb->int_urb = NULL;
 		return -ENOMEM;
 	}
 	
 	/* Initialize interrupt URB */
-	usb_fill_int_urb(dev->usb.int_urb, dev->usb.udev,
-			 usb_rcvintpipe(dev->usb.udev, dev->usb.ep_int_in->bEndpointAddress),
-			 dev->usb.int_buffer, usb_endpoint_maxp(dev->usb.ep_int_in),
-			 canon_r5_usb_int_callback, dev, dev->usb.ep_int_in->bInterval);
+	usb_fill_int_urb(dev->usb->int_urb, dev->usb->udev,
+			 usb_rcvintpipe(dev->usb->udev, dev->usb->ep_int_in->bEndpointAddress),
+			 dev->usb->int_buffer, usb_endpoint_maxp(dev->usb->ep_int_in),
+			 canon_r5_usb_int_callback, dev, dev->usb->ep_int_in->bInterval);
 	
 	/* Submit interrupt URB */
-	ret = usb_submit_urb(dev->usb.int_urb, GFP_KERNEL);
+	ret = usb_submit_urb(dev->usb->int_urb, GFP_KERNEL);
 	if (ret) {
 		canon_r5_err(dev, "Failed to submit interrupt URB: %d", ret);
-		kfree(dev->usb.int_buffer);
-		dev->usb.int_buffer = NULL;
-		usb_free_urb(dev->usb.int_urb);
-		dev->usb.int_urb = NULL;
+		kfree(dev->usb->int_buffer);
+		dev->usb->int_buffer = NULL;
+		usb_free_urb(dev->usb->int_urb);
+		dev->usb->int_urb = NULL;
 		return ret;
 	}
 	
@@ -207,15 +222,15 @@ static int canon_r5_usb_init_endpoints(struct canon_r5_device *dev)
 /* Cleanup USB resources */
 static void canon_r5_usb_cleanup_endpoints(struct canon_r5_device *dev)
 {
-	if (dev->usb.int_urb) {
-		usb_kill_urb(dev->usb.int_urb);
-		usb_free_urb(dev->usb.int_urb);
-		dev->usb.int_urb = NULL;
+	if (dev->usb->int_urb) {
+		usb_kill_urb(dev->usb->int_urb);
+		usb_free_urb(dev->usb->int_urb);
+		dev->usb->int_urb = NULL;
 	}
 	
-	if (dev->usb.int_buffer) {
-		kfree(dev->usb.int_buffer);
-		dev->usb.int_buffer = NULL;
+	if (dev->usb->int_buffer) {
+		kfree(dev->usb->int_buffer);
+		dev->usb->int_buffer = NULL;
 	}
 }
 
@@ -229,7 +244,7 @@ int canon_r5_usb_bulk_send(struct canon_r5_device *dev, const void *data, size_t
 	if (!dev || !data || !len)
 		return -EINVAL;
 	
-	if (!dev->usb.ep_bulk_out)
+	if (!dev->usb->ep_bulk_out)
 		return -ENODEV;
 	
 	/* Allocate transfer buffer */
@@ -241,8 +256,8 @@ int canon_r5_usb_bulk_send(struct canon_r5_device *dev, const void *data, size_t
 	memcpy(transfer_buffer, data, len);
 	
 	/* Use synchronous bulk transfer */
-	ret = usb_bulk_msg(dev->usb.udev,
-			   usb_sndbulkpipe(dev->usb.udev, dev->usb.ep_bulk_out->bEndpointAddress),
+	ret = usb_bulk_msg(dev->usb->udev,
+			   usb_sndbulkpipe(dev->usb->udev, dev->usb->ep_bulk_out->bEndpointAddress),
 			   transfer_buffer, len, &actual_len, 5000);
 	
 	if (ret) {
@@ -267,7 +282,7 @@ int canon_r5_usb_bulk_receive(struct canon_r5_device *dev, void *data, size_t le
 	if (!dev || !data || !len)
 		return -EINVAL;
 	
-	if (!dev->usb.ep_bulk_in)
+	if (!dev->usb->ep_bulk_in)
 		return -ENODEV;
 	
 	/* Allocate transfer buffer */
@@ -276,8 +291,8 @@ int canon_r5_usb_bulk_receive(struct canon_r5_device *dev, void *data, size_t le
 		return -ENOMEM;
 	
 	/* Use synchronous bulk transfer */
-	ret = usb_bulk_msg(dev->usb.udev,
-			   usb_rcvbulkpipe(dev->usb.udev, dev->usb.ep_bulk_in->bEndpointAddress),
+	ret = usb_bulk_msg(dev->usb->udev,
+			   usb_rcvbulkpipe(dev->usb->udev, dev->usb->ep_bulk_in->bEndpointAddress),
 			   transfer_buffer, len, &received_len, 5000);
 	
 	if (ret) {
@@ -296,6 +311,12 @@ int canon_r5_usb_bulk_receive(struct canon_r5_device *dev, void *data, size_t le
 	return ret;
 }
 EXPORT_SYMBOL_GPL(canon_r5_usb_bulk_receive);
+
+/* USB transport operations */
+static struct canon_r5_transport_ops usb_transport_ops = {
+	.bulk_send = canon_r5_usb_bulk_send,
+	.bulk_receive = canon_r5_usb_bulk_receive,
+};
 
 /* USB device probe function */
 static int canon_r5_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
@@ -317,9 +338,17 @@ static int canon_r5_usb_probe(struct usb_interface *intf, const struct usb_devic
 		return -ENOMEM;
 	}
 	
+	/* Allocate USB transport structure */
+	dev->usb = kzalloc(sizeof(struct canon_r5_usb), GFP_KERNEL);
+	if (!dev->usb) {
+		dev_err(&intf->dev, "Failed to allocate USB transport data\n");
+		canon_r5_device_put(dev);
+		return -ENOMEM;
+	}
+	
 	/* Initialize USB layer */
-	dev->usb.udev = usb_get_dev(udev);
-	dev->usb.intf = usb_get_intf(intf);
+	dev->usb->udev = usb_get_dev(udev);
+	dev->usb->intf = usb_get_intf(intf);
 	
 	/* Set device data */
 	usb_set_intfdata(intf, dev);
@@ -331,11 +360,18 @@ static int canon_r5_usb_probe(struct usb_interface *intf, const struct usb_devic
 		goto error_endpoints;
 	}
 	
+	/* Register transport layer */
+	ret = canon_r5_register_transport(dev, &usb_transport_ops);
+	if (ret) {
+		dev_err(&intf->dev, "Failed to register transport: %d\n", ret);
+		goto error_endpoints;
+	}
+	
 	/* Initialize device */
 	ret = canon_r5_device_initialize(dev);
 	if (ret) {
 		dev_err(&intf->dev, "Failed to initialize device: %d\n", ret);
-		goto error_init;
+		goto error_transport;
 	}
 	
 	canon_r5_set_state(dev, CANON_R5_STATE_CONNECTED);
@@ -346,11 +382,12 @@ static int canon_r5_usb_probe(struct usb_interface *intf, const struct usb_devic
 	
 	return 0;
 	
-error_init:
+error_transport:
+	canon_r5_unregister_transport(dev);
 	canon_r5_usb_cleanup_endpoints(dev);
 error_endpoints:
-	usb_put_intf(dev->usb.intf);
-	usb_put_dev(dev->usb.udev);
+	usb_put_intf(dev->usb->intf);
+	usb_put_dev(dev->usb->udev);
 	usb_set_intfdata(intf, NULL);
 	canon_r5_device_put(dev);
 	return ret;
@@ -366,6 +403,9 @@ static void canon_r5_usb_disconnect(struct usb_interface *intf)
 	
 	dev_info(&intf->dev, "Canon R5 device disconnecting\n");
 	
+	/* Unregister transport */
+	canon_r5_unregister_transport(dev);
+	
 	/* Cleanup device */
 	canon_r5_device_cleanup(dev);
 	
@@ -373,8 +413,12 @@ static void canon_r5_usb_disconnect(struct usb_interface *intf)
 	canon_r5_usb_cleanup_endpoints(dev);
 	
 	/* Release USB references */
-	usb_put_intf(dev->usb.intf);
-	usb_put_dev(dev->usb.udev);
+	usb_put_intf(dev->usb->intf);
+	usb_put_dev(dev->usb->udev);
+	
+	/* Free USB transport structure */
+	kfree(dev->usb);
+	dev->usb = NULL;
 	
 	usb_set_intfdata(intf, NULL);
 	
@@ -398,16 +442,10 @@ static int __init canon_r5_usb_init(void)
 	
 	pr_info("Canon R5 Driver Suite - USB Transport Module Loading\n");
 	
-	/* Initialize core if not already done */
-	ret = canon_r5_core_init();
-	if (ret)
-		return ret;
-	
-	/* Register USB driver */
+	/* Register USB driver - core module should be loaded separately */
 	ret = usb_register(&canon_r5_usb_driver);
 	if (ret) {
 		pr_err("Failed to register USB driver: %d\n", ret);
-		canon_r5_core_exit();
 		return ret;
 	}
 	
@@ -420,7 +458,6 @@ static void __exit canon_r5_usb_exit(void)
 	pr_info("Canon R5 Driver Suite - USB Transport Module Unloading\n");
 	
 	usb_deregister(&canon_r5_usb_driver);
-	canon_r5_core_exit();
 	
 	pr_info("Canon R5 Driver Suite - USB Transport Module Unloaded\n");
 }

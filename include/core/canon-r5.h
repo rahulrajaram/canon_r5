@@ -10,7 +10,6 @@
 #define __CANON_R5_H__
 
 #include <linux/device.h>
-#include <linux/usb.h>
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
@@ -49,6 +48,7 @@
 struct canon_r5_device;
 struct canon_r5_ptp_command;
 struct canon_r5_event;
+struct canon_r5_usb;
 
 /* Device state */
 enum canon_r5_state {
@@ -57,6 +57,12 @@ enum canon_r5_state {
 	CANON_R5_STATE_INITIALIZED,
 	CANON_R5_STATE_READY,
 	CANON_R5_STATE_ERROR
+};
+
+/* Transport layer abstraction */
+struct canon_r5_transport_ops {
+	int (*bulk_send)(struct canon_r5_device *dev, const void *data, size_t len);
+	int (*bulk_receive)(struct canon_r5_device *dev, void *data, size_t len, size_t *actual_len);
 };
 
 /* PTP session information */
@@ -69,17 +75,7 @@ struct canon_r5_ptp {
 	struct workqueue_struct	*event_wq;
 };
 
-/* USB transport layer */
-struct canon_r5_usb {
-	struct usb_device	*udev;
-	struct usb_interface	*intf;
-	struct usb_endpoint_descriptor *ep_int_in;
-	struct usb_endpoint_descriptor *ep_bulk_in;
-	struct usb_endpoint_descriptor *ep_bulk_out;
-	struct urb		*int_urb;
-	u8			*int_buffer;
-	size_t			max_packet_size;
-};
+/* USB transport layer - defined in USB module */
 
 /* Event handling */
 struct canon_r5_event_handler {
@@ -99,7 +95,10 @@ struct canon_r5_device {
 	struct device		*dev;
 	
 	/* USB layer */
-	struct canon_r5_usb	usb;
+	struct canon_r5_usb	*usb;
+	
+	/* Transport layer */
+	struct canon_r5_transport_ops *transport_ops;
 	
 	/* PTP layer */
 	struct canon_r5_ptp	ptp;
@@ -149,6 +148,10 @@ void canon_r5_device_put(struct canon_r5_device *dev);
 int canon_r5_device_initialize(struct canon_r5_device *dev);
 void canon_r5_device_cleanup(struct canon_r5_device *dev);
 
+/* Transport layer management */
+int canon_r5_register_transport(struct canon_r5_device *dev, struct canon_r5_transport_ops *ops);
+void canon_r5_unregister_transport(struct canon_r5_device *dev);
+
 /* State management */
 int canon_r5_set_state(struct canon_r5_device *dev, enum canon_r5_state new_state);
 enum canon_r5_state canon_r5_get_state(struct canon_r5_device *dev);
@@ -178,6 +181,18 @@ void canon_r5_unregister_input_driver(struct canon_r5_device *dev);
 void canon_r5_unregister_lens_driver(struct canon_r5_device *dev);
 void canon_r5_unregister_display_driver(struct canon_r5_device *dev);
 void canon_r5_unregister_wireless_driver(struct canon_r5_device *dev);
+
+/* Get driver private data */
+void *canon_r5_get_video_driver(struct canon_r5_device *dev);
+void *canon_r5_get_still_driver(struct canon_r5_device *dev);
+void *canon_r5_get_audio_driver(struct canon_r5_device *dev);
+void *canon_r5_get_storage_driver(struct canon_r5_device *dev);
+void *canon_r5_get_control_driver(struct canon_r5_device *dev);
+void *canon_r5_get_power_driver(struct canon_r5_device *dev);
+void *canon_r5_get_input_driver(struct canon_r5_device *dev);
+void *canon_r5_get_lens_driver(struct canon_r5_device *dev);
+void *canon_r5_get_display_driver(struct canon_r5_device *dev);
+void *canon_r5_get_wireless_driver(struct canon_r5_device *dev);
 
 /* Debugging */
 #define canon_r5_dbg(dev, fmt, ...) \

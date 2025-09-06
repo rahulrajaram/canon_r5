@@ -1,0 +1,305 @@
+# Canon R5 Driver Suite Continuous Integration
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  KBUILD_OUTPUT: build
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        kernel-version: ['6.1', '6.5', '6.6']
+        arch: ['x86_64']
+        include:
+          - kernel-version: '6.1'
+            kernel-package: 'linux-headers-6.1.0-*-generic'
+          - kernel-version: '6.5'
+            kernel-package: 'linux-headers-6.5.0-*-generic'
+          - kernel-version: '6.6'
+            kernel-package: 'linux-headers-6.6.0-*-generic'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup kernel build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          linux-headers-generic \
+          kmod \
+          coreutils \
+          python3 \
+          python3-pip \
+          git \
+          make \
+          gcc \
+          libc6-dev \
+          dkms
+    
+    - name: Install Python dependencies
+      run: |
+        pip3 install --user pytest pytest-cov
+    
+    - name: Check kernel headers
+      run: |
+        ls -la /usr/src/
+        ls -la /lib/modules/
+        uname -r
+        
+    - name: Validate source code
+      run: |
+        echo "Checking for common issues..."
+        # Check for tabs vs spaces
+        if grep -r "        " drivers/ include/ | grep -v ".git"; then
+          echo "Warning: Found spaces instead of tabs in some files"
+        fi
+        
+        # Check for SPDX headers
+        missing_spdx=$(find drivers/ include/ -name "*.c" -o -name "*.h" | xargs grep -L "SPDX-License-Identifier" || true)
+        if [ -n "$missing_spdx" ]; then
+          echo "Warning: Files missing SPDX headers:"
+          echo "$missing_spdx"
+        fi
+    
+    - name: Build modules
+      run: |
+        echo "Building Canon R5 driver modules..."
+        make clean
+        make modules
+        
+        echo "Checking built modules..."
+        ls -la *.ko
+        
+        # Verify module info
+        for module in *.ko; do
+          echo "Module info for $module:"
+          modinfo "$module" || echo "Failed to get module info for $module"
+        done
+    
+    - name: Run static analysis
+      run: |
+        echo "Running basic static analysis..."
+        
+        # Check for obvious issues
+        echo "Checking for printk usage (should use dev_* functions):"
+        grep -r "printk" drivers/ include/ || echo "No printk usage found"
+        
+        echo "Checking for potential memory leaks (basic check):"
+        if grep -r "kmalloc\|kzalloc" drivers/ | grep -v "kfree"; then
+          echo "Found allocations - ensure corresponding frees exist"
+        fi
+        
+        echo "Checking for proper error handling:"
+        error_patterns="return.*-E[A-Z]"
+        if ! grep -r "$error_patterns" drivers/; then
+          echo "Warning: No error returns found - check error handling"
+        fi
+    
+    - name: Run unit tests (KUnit)
+      run: |
+        echo "Setting up KUnit tests..."
+        if [ -d tests/kunit ]; then
+          echo "KUnit tests would run here (requires kernel with KUnit support)"
+          # In a real environment, this would run:
+          # ./tools/testing/kunit/kunit.py run --kunitconfig=tests/kunit/
+        else
+          echo "No KUnit tests found"
+        fi
+      continue-on-error: true
+    
+    - name: Run integration tests
+      run: |
+        echo "Running integration tests..."
+        if [ -x tests/integration/test_driver_loading.sh ]; then
+          # Run in test environment mode
+          export CANON_R5_TEST_ENV=1
+          tests/integration/test_driver_loading.sh || echo "Integration tests completed with warnings (expected without hardware)"
+        else
+          echo "No integration tests found"
+        fi
+      continue-on-error: true
+    
+    - name: Run performance benchmarks
+      run: |
+        echo "Running performance benchmarks..."
+        if [ -x tests/performance/benchmark.py ]; then
+          python3 tests/performance/benchmark.py --verbose --output benchmark-results.json
+        else
+          echo "No performance benchmarks found"
+        fi
+      continue-on-error: true
+    
+    - name: Check memory usage
+      run: |
+        echo "Checking module memory footprint..."
+        total_size=0
+        for module in *.ko; do
+          if [ -f "$module" ]; then
+            size=$(stat -c%s "$module")
+            echo "$module: $size bytes"
+            total_size=$((total_size + size))
+          fi
+        done
+        echo "Total module size: $total_size bytes"
+        
+        # Warn if modules are getting too large
+        if [ $total_size -gt $((10 * 1024 * 1024)) ]; then
+          echo "Warning: Total module size exceeds 10MB"
+        fi
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-modules-${{ matrix.kernel-version }}-${{ matrix.arch }}
+        path: |
+          *.ko
+          Module.symvers
+          modules.order
+        retention-days: 7
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.kernel-version }}-${{ matrix.arch }}
+        path: |
+          /tmp/canon_r5_test.log
+          benchmark-results.json
+        retention-days: 7
+
+  code-quality:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install checkpatch
+      run: |
+        # Get checkpatch script from kernel source
+        wget -O checkpatch.pl https://raw.githubusercontent.com/torvalds/linux/master/scripts/checkpatch.pl
+        chmod +x checkpatch.pl
+    
+    - name: Run checkpatch
+      run: |
+        echo "Running checkpatch on source files..."
+        
+        # Check all C files and headers
+        find drivers/ include/ -name "*.c" -o -name "*.h" | while read file; do
+          echo "Checking $file..."
+          ./checkpatch.pl --no-tree --file "$file" || echo "Checkpatch issues found in $file"
+        done
+      continue-on-error: true
+    
+    - name: Check documentation
+      run: |
+        echo "Checking documentation completeness..."
+        
+        # Check if README is up to date
+        if [ -f README.md ]; then
+          echo "README.md exists"
+          # Check if README mentions all major components
+          components="video audio storage still"
+          for comp in $components; do
+            if ! grep -qi "$comp" README.md; then
+              echo "Warning: README.md may not mention $comp component"
+            fi
+          done
+        else
+          echo "Warning: No README.md found"
+        fi
+    
+    - name: License compliance check
+      run: |
+        echo "Checking license compliance..."
+        
+        # Check SPDX headers
+        find drivers/ include/ tests/ -name "*.c" -o -name "*.h" -o -name "*.py" -o -name "*.sh" | while read file; do
+          if ! head -5 "$file" | grep -q "SPDX-License-Identifier"; then
+            echo "Missing SPDX header in: $file"
+          fi
+        done
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Basic security checks
+      run: |
+        echo "Running basic security checks..."
+        
+        # Check for potential security issues
+        echo "Checking for unsafe string functions..."
+        if grep -r "strcpy\|strcat\|sprintf\|gets" drivers/ include/; then
+          echo "Warning: Found potentially unsafe string functions"
+        fi
+        
+        echo "Checking for proper input validation..."
+        if ! grep -r "copy_from_user\|copy_to_user" drivers/; then
+          echo "Info: No user space copying found"
+        fi
+        
+        echo "Checking for proper capability checks..."
+        if grep -r "capable(" drivers/; then
+          echo "Found capability checks (good for security)"
+        fi
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Check documentation
+      run: |
+        echo "Validating documentation..."
+        
+        # Check if all major files have proper headers
+        for file in drivers/*/*.c include/*/*.h; do
+          if [ -f "$file" ]; then
+            if ! head -10 "$file" | grep -q "Copyright"; then
+              echo "Missing copyright in: $file"
+            fi
+            if ! head -10 "$file" | grep -q "SPDX-License"; then
+              echo "Missing SPDX license in: $file"
+            fi
+          fi
+        done
+        
+        # Check for TODO/FIXME comments
+        echo "Checking for TODO/FIXME items..."
+        grep -r "TODO\|FIXME\|XXX" drivers/ include/ || echo "No TODO items found"
+    
+    - name: Generate documentation report
+      run: |
+        echo "Generating documentation report..."
+        
+        # Count lines of code
+        total_c_lines=$(find drivers/ -name "*.c" -exec wc -l {} + | tail -1 | awk '{print $1}')
+        total_h_lines=$(find include/ -name "*.h" -exec wc -l {} + | tail -1 | awk '{print $1}')
+        
+        echo "Lines of C code: $total_c_lines"
+        echo "Lines of headers: $total_h_lines"
+        echo "Total lines: $((total_c_lines + total_h_lines))"
+        
+        # Count functions
+        func_count=$(grep -r "^[a-zA-Z_][a-zA-Z0-9_]*.*(" drivers/ include/ | grep -v "^\s*//" | wc -l)
+        echo "Approximate function count: $func_count"

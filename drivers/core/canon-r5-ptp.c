@@ -21,9 +21,20 @@ MODULE_DESCRIPTION("Canon R5 Camera Driver Suite - PTP Protocol");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION(CANON_R5_DRIVER_VERSION);
 
-/* Forward declarations */
-extern int canon_r5_usb_bulk_send(struct canon_r5_device *dev, const void *data, size_t len);
-extern int canon_r5_usb_bulk_receive(struct canon_r5_device *dev, void *data, size_t len, size_t *actual_len);
+/* Transport layer functions */
+static int canon_r5_transport_send(struct canon_r5_device *dev, const void *data, size_t len)
+{
+	if (!dev->transport_ops || !dev->transport_ops->bulk_send)
+		return -ENODEV;
+	return dev->transport_ops->bulk_send(dev, data, len);
+}
+
+static int canon_r5_transport_receive(struct canon_r5_device *dev, void *data, size_t len, size_t *actual_len)
+{
+	if (!dev->transport_ops || !dev->transport_ops->bulk_receive)
+		return -ENODEV;
+	return dev->transport_ops->bulk_receive(dev, data, len, actual_len);
+}
 
 /* Helper function to build PTP container */
 static void build_ptp_container(struct ptp_container *container, u16 type, u16 code, 
@@ -71,7 +82,7 @@ int canon_r5_ptp_command(struct canon_r5_device *dev, u16 code,
 	build_ptp_container(&cmd, PTP_CONTAINER_COMMAND, code, trans_id, params, param_count);
 	
 	/* Send command */
-	ret = canon_r5_usb_bulk_send(dev, &cmd, le32_to_cpu(cmd.length));
+	ret = canon_r5_transport_send(dev, &cmd, le32_to_cpu(cmd.length));
 	if (ret) {
 		canon_r5_err(dev, "Failed to send PTP command 0x%04x: %d", code, ret);
 		mutex_unlock(&dev->ptp.lock);
@@ -87,14 +98,14 @@ int canon_r5_ptp_command(struct canon_r5_device *dev, u16 code,
 		build_ptp_container(&data_container, PTP_CONTAINER_DATA, code, trans_id, NULL, 0);
 		data_container.length = cpu_to_le32(sizeof(data_container) + data_len);
 		
-		ret = canon_r5_usb_bulk_send(dev, &data_container, sizeof(data_container));
+		ret = canon_r5_transport_send(dev, &data_container, sizeof(data_container));
 		if (ret) {
 			canon_r5_err(dev, "Failed to send PTP data header: %d", ret);
 			mutex_unlock(&dev->ptp.lock);
 			return ret;
 		}
 		
-		ret = canon_r5_usb_bulk_send(dev, data, data_len);
+		ret = canon_r5_transport_send(dev, data, data_len);
 		if (ret) {
 			canon_r5_err(dev, "Failed to send PTP data: %d", ret);
 			mutex_unlock(&dev->ptp.lock);
@@ -105,7 +116,7 @@ int canon_r5_ptp_command(struct canon_r5_device *dev, u16 code,
 	}
 	
 	/* Receive response */
-	ret = canon_r5_usb_bulk_receive(dev, &resp, sizeof(resp), &resp_len);
+	ret = canon_r5_transport_receive(dev, &resp, sizeof(resp), &resp_len);
 	if (ret) {
 		canon_r5_err(dev, "Failed to receive PTP response: %d", ret);
 		mutex_unlock(&dev->ptp.lock);

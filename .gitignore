@@ -36,6 +36,9 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Build directory (organized build artifacts)
+build/
+
 # Testing artifacts
 test_results/
 coverage/

@@ -233,4 +233,54 @@ config CANON_R5_ADVANCED
 	  These features are for advanced users and developers only.
 	  Use with caution as they may affect camera stability.
 
+config CANON_R5_CORE_KUNIT_TEST
+	tristate "Canon R5 Core KUnit Tests" if !KUNIT_ALL_TESTS
+	depends on CANON_R5_CORE && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  This builds unit tests for the Canon R5 core driver.
+	  
+	  For more information on KUnit and unit tests in general, refer to
+	  the KUnit documentation in Documentation/dev-tools/kunit/.
+
+config CANON_R5_PTP_KUNIT_TEST
+	tristate "Canon R5 PTP KUnit Tests" if !KUNIT_ALL_TESTS
+	depends on CANON_R5_CORE && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  This builds unit tests for the Canon R5 PTP protocol layer.
+	  
+	  For more information on KUnit and unit tests in general, refer to
+	  the KUnit documentation in Documentation/dev-tools/kunit/.
+
+config CANON_R5_STORAGE_KUNIT_TEST
+	tristate "Canon R5 Storage KUnit Tests" if !KUNIT_ALL_TESTS
+	depends on CANON_R5_STORAGE && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  This builds unit tests for the Canon R5 storage/filesystem driver.
+	  
+	  For more information on KUnit and unit tests in general, refer to
+	  the KUnit documentation in Documentation/dev-tools/kunit/.
+
+config CANON_R5_AUDIO_KUNIT_TEST
+	tristate "Canon R5 Audio KUnit Tests" if !KUNIT_ALL_TESTS
+	depends on CANON_R5_AUDIO && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  This builds unit tests for the Canon R5 ALSA audio driver.
+	  
+	  For more information on KUnit and unit tests in general, refer to
+	  the KUnit documentation in Documentation/dev-tools/kunit/.
+
+config CANON_R5_VIDEO_KUNIT_TEST
+	tristate "Canon R5 Video KUnit Tests" if !KUNIT_ALL_TESTS
+	depends on CANON_R5_VIDEO && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  This builds unit tests for the Canon R5 V4L2 video driver.
+	  
+	  For more information on KUnit and unit tests in general, refer to
+	  the KUnit documentation in Documentation/dev-tools/kunit/.
+
 endif # CANON_R5

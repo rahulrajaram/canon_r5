@@ -15,8 +15,7 @@
 #include <linux/idr.h>
 #include <linux/kref.h>
 #include <linux/workqueue.h>
-#include <linux/usb.h>
-
+#include <linux/kdev_t.h>
 #include "../../include/core/canon-r5.h"
 #include "../../include/core/canon-r5-ptp.h"
 
@@ -173,6 +172,42 @@ void canon_r5_device_cleanup(struct canon_r5_device *dev)
 }
 EXPORT_SYMBOL_GPL(canon_r5_device_cleanup);
 
+/* Transport layer management */
+int canon_r5_register_transport(struct canon_r5_device *dev, struct canon_r5_transport_ops *ops)
+{
+	if (!dev || !ops) {
+		pr_err("Invalid device or transport ops\n");
+		return -EINVAL;
+	}
+
+	mutex_lock(&dev->state_lock);
+	if (dev->transport_ops) {
+		mutex_unlock(&dev->state_lock);
+		pr_warn("Transport already registered\n");
+		return -EEXIST;
+	}
+
+	dev->transport_ops = ops;
+	mutex_unlock(&dev->state_lock);
+
+	pr_info("Transport layer registered\n");
+	return 0;
+}
+EXPORT_SYMBOL_GPL(canon_r5_register_transport);
+
+void canon_r5_unregister_transport(struct canon_r5_device *dev)
+{
+	if (!dev)
+		return;
+
+	mutex_lock(&dev->state_lock);
+	dev->transport_ops = NULL;
+	mutex_unlock(&dev->state_lock);
+
+	pr_info("Transport layer unregistered\n");
+}
+EXPORT_SYMBOL_GPL(canon_r5_unregister_transport);
+
 int canon_r5_set_state(struct canon_r5_device *dev, enum canon_r5_state new_state)
 {
 	enum canon_r5_state old_state;
@@ -282,6 +317,12 @@ void canon_r5_unregister_audio_driver(struct canon_r5_device *dev)
 }
 EXPORT_SYMBOL_GPL(canon_r5_unregister_audio_driver);
 
+void *canon_r5_get_audio_driver(struct canon_r5_device *dev)
+{
+	return dev ? dev->audio_priv : NULL;
+}
+EXPORT_SYMBOL_GPL(canon_r5_get_audio_driver);
+
 int canon_r5_register_storage_driver(struct canon_r5_device *dev, void *priv)
 {
 	if (!dev)
@@ -301,6 +342,12 @@ void canon_r5_unregister_storage_driver(struct canon_r5_device *dev)
 	}
 }
 EXPORT_SYMBOL_GPL(canon_r5_unregister_storage_driver);
+
+void *canon_r5_get_storage_driver(struct canon_r5_device *dev)
+{
+	return dev ? dev->storage_priv : NULL;
+}
+EXPORT_SYMBOL_GPL(canon_r5_get_storage_driver);
 
 int canon_r5_register_control_driver(struct canon_r5_device *dev, void *priv)
 {

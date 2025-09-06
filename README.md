@@ -1,700 +1,334 @@
 # Canon R5 Linux Driver Suite
 
-A comprehensive Linux kernel driver suite providing complete Canon R5 camera integration, including video capture, still photography, audio, storage, and full camera control.
+Linux kernel driver suite for Canon R5 camera providing complete integration with standard Linux APIs (V4L2, ALSA, MTP).
 
-## Project Overview
+## Quick Start
 
-This driver suite creates a complete interface between Canon R5 and Linux, exposing all camera functionality through standard Linux APIs (V4L2, ALSA, MTP, sysfs) and custom interfaces for advanced features.
+### Prerequisites
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Userspace Applications                    │
-├─────────────────────────────────────────────────────────────┤
-│ libcanon-r5 │ gphoto2 │ v4l-utils │ ALSA │ MTP │ GUI Tools │
-├─────────────────────────────────────────────────────────────┤
-│                     System Interfaces                        │
-│    /dev/video* │ /dev/snd/* │ /dev/canon-r5 │ /sys/class   │
-├─────────────────────────────────────────────────────────────┤
-│                    Canon R5 Driver Suite                     │
-│  Video │ Still │ Audio │ Storage │ Control │ Power │ Input  │
-├─────────────────────────────────────────────────────────────┤
-│              Canon PTP/MTP Protocol Core                     │
-├─────────────────────────────────────────────────────────────┤
-│                    USB Transport Layer                       │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Directory Structure
-
-```
-canon_r5/
-├── drivers/
-│   ├── core/                      # Core infrastructure
-│   │   ├── canon-r5-core.c        # Core driver infrastructure
-│   │   ├── canon-r5-usb.c         # USB transport layer
-│   │   └── canon-r5-ptp.c         # PTP/MTP protocol core
-│   ├── video/                     # Video capture drivers
-│   │   ├── canon-r5-v4l2.c        # V4L2 video driver
-│   │   ├── canon-r5-encoder.c     # Hardware encoder interface
-│   │   └── canon-r5-streaming.c   # Streaming optimizations
-│   ├── still/                     # Still image capture
-│   │   ├── canon-r5-capture.c     # Still image capture
-│   │   ├── canon-r5-raw.c         # RAW (CR3) processing
-│   │   └── canon-r5-burst.c       # Burst mode handling
-│   ├── audio/                     # Audio drivers
-│   │   ├── canon-r5-alsa.c        # ALSA driver
-│   │   └── canon-r5-audio-sync.c  # A/V synchronization
-│   ├── storage/                   # Storage access
-│   │   ├── canon-r5-mtp.c         # MTP filesystem
-│   │   ├── canon-r5-cards.c       # Card management
-│   │   └── canon-r5-metadata.c    # EXIF/metadata handling
-│   ├── control/                   # Camera control
-│   │   ├── canon-r5-sysfs.c       # Sysfs interface
-│   │   ├── canon-r5-ioctl.c       # ioctl interface
-│   │   └── canon-r5-settings.c    # Settings management
-│   ├── power/                     # Power management
-│   │   ├── canon-r5-power.c       # Power management
-│   │   ├── canon-r5-thermal.c     # Thermal management
-│   │   └── canon-r5-battery.c     # Battery monitoring
-│   ├── input/                     # Input devices
-│   │   ├── canon-r5-buttons.c     # Button/dial input
-│   │   ├── canon-r5-touchscreen.c # Touchscreen driver
-│   │   └── canon-r5-events.c      # Event system
-│   ├── lens/                      # Lens communication
-│   │   ├── canon-r5-lens.c        # Lens communication
-│   │   ├── canon-r5-rf.c          # RF protocol
-│   │   └── canon-r5-ef.c          # EF compatibility
-│   ├── display/                   # Display control
-│   │   ├── canon-r5-lcd.c         # LCD control
-│   │   ├── canon-r5-evf.c         # EVF control
-│   │   └── canon-r5-overlay.c     # Overlay rendering
-│   └── wireless/                  # Wireless features
-│       ├── canon-r5-gps.c         # GPS driver
-│       ├── canon-r5-wifi.c        # WiFi integration
-│       └── canon-r5-bluetooth.c   # Bluetooth support
-├── include/                       # Header files
-│   ├── core/
-│   ├── video/
-│   ├── still/
-│   ├── audio/
-│   └── [corresponding headers for each driver]
-├── lib/                           # Userspace libraries
-│   ├── libcanon-r5/               # Main userspace library
-│   ├── gphoto2-plugin/            # gphoto2 integration
-│   └── v4l2-plugin/               # v4l2 plugins
-├── tools/                         # Userspace tools
-│   ├── canon-r5-cli               # Command-line tool
-│   ├── canon-r5-gui               # GUI application
-│   └── canon-r5-daemon            # Background service
-├── scripts/                       # Build and development scripts
-│   ├── build.sh                   # Build script
-│   ├── install.sh                 # Installation script
-│   ├── uninstall.sh               # Uninstallation script
-│   └── test.sh                    # Testing script
-├── docs/                          # Documentation
-│   ├── protocol.md                # PTP protocol documentation
-│   ├── api.md                     # Driver API documentation
-│   ├── development.md             # Development guide
-│   └── drivers/                   # Per-driver documentation
-├── tests/                         # Test programs
-│   ├── unit/                      # Unit tests
-│   ├── integration/               # Integration tests
-│   └── performance/               # Performance benchmarks
-├── firmware/                      # Firmware blobs (if needed)
-├── Makefile                       # Main kernel module Makefile
-├── Kconfig                        # Kernel configuration
-└── README.md                      # This file
-```
-
-## Driver Components
-
-### 1. Video Capture Driver (V4L2)
-**Features:**
-- Live view streaming (MJPEG, H.264, RAW)
-- Multiple resolution support (8K, 4K, 1080p, 720p)
-- Hardware encoder passthrough
-- Zero-copy buffer management
-- HDR video support
-- Frame rates up to 120fps (1080p)
-
-**Interfaces:**
-```
-/dev/video0 - Main sensor output
-/dev/video1 - Viewfinder/preview
-/dev/video2 - Hardware encoder output
-```
-
-### 2. Still Image Capture Driver
-**Features:**
-- RAW (CR3) capture support
-- JPEG/HEIF capture
-- Burst mode (up to 20fps mechanical, 30fps electronic)
-- Bracketing support (exposure, focus, white balance)
-- Focus stacking interface
-- Dual Pixel RAW support
-- Pixel shift multi-shot
-
-**Interfaces:**
-```
-/dev/canon-r5-still   - Direct capture interface
-libgphoto2 plugin     - Standard photo application support
-```
-
-### 3. Audio Driver (ALSA)
-**Features:**
-- External microphone input control
-- Built-in microphone support
-- Audio level monitoring
-- Sample rate selection (48kHz, 96kHz)
-- Audio sync with video
-- Wind filter control
-- Attenuator settings
-
-**Implementation:**
-```
-/dev/snd/pcmC0D0c - Capture device
-/dev/snd/controlC0 - Mixer controls
-```
-
-### 4. Mass Storage Driver (MTP/PTP)
-**Features:**
-- Direct card access (CFexpress Type B, SD UHS-II)
-- File management without unmounting
-- Thumbnail generation
-- Metadata extraction
-- Parallel dual-card operations
-- Card formatting
-- File recovery support
-
-**Interfaces:**
-```
-/dev/canon-r5-storage0 - CFexpress card
-/dev/canon-r5-storage1 - SD card
-MTP filesystem mount points
-```
-
-### 5. Camera Control Interface
-**Comprehensive Controls via sysfs:**
-```
-# Exposure Controls
-/sys/class/canon-r5/exposure/mode         (M/Av/Tv/P/Auto/B/C1/C2/C3)
-/sys/class/canon-r5/exposure/shutter      (1/8000 - 30s)
-/sys/class/canon-r5/exposure/aperture     (f/1.2 - f/32)
-/sys/class/canon-r5/exposure/iso          (100 - 102400, expanded 50-819200)
-/sys/class/canon-r5/exposure/compensation (-3 to +3 EV)
-
-# Focus System
-/sys/class/canon-r5/focus/mode            (AF-S/AF-C/MF)
-/sys/class/canon-r5/focus/area            (Single/Zone/Large Zone/Wide)
-/sys/class/canon-r5/focus/tracking        (Face/Eye/Animal/Vehicle)
-/sys/class/canon-r5/focus/points          (1053 AF points selection)
-/sys/class/canon-r5/focus/peaking         (On/Off/Color/Level)
-
-# Image Processing
-/sys/class/canon-r5/image/picture_style   (Standard/Portrait/Landscape/etc)
-/sys/class/canon-r5/image/white_balance   (Auto/Daylight/Tungsten/Custom)
-/sys/class/canon-r5/image/color_space     (sRGB/AdobeRGB)
-/sys/class/canon-r5/image/noise_reduction
-/sys/class/canon-r5/image/sharpness
-/sys/class/canon-r5/image/clarity
-/sys/class/canon-r5/image/dual_pixel_raw
-
-# Stabilization
-/sys/class/canon-r5/ibis/enabled
-/sys/class/canon-r5/ibis/mode             (Still/Panning/Off)
-/sys/class/canon-r5/ibis/level            (Up to 8 stops)
-/sys/class/canon-r5/lens/is_mode          (Mode1/Mode2/Mode3)
-/sys/class/canon-r5/lens/is_coordination
-
-# Advanced Features
-/sys/class/canon-r5/hdr/enabled
-/sys/class/canon-r5/hdr/strength
-/sys/class/canon-r5/pixel_shift/enabled
-/sys/class/canon-r5/focus_bracketing/steps
-/sys/class/canon-r5/focus_bracketing/increment
-/sys/class/canon-r5/intervalometer/interval
-/sys/class/canon-r5/intervalometer/count
-```
-
-### 6. Power Management Driver
-**Features:**
-- USB Power Delivery support
-- Battery status monitoring (LP-E6NH)
-- Battery grip support (BG-R10)
-- Thermal management
-- Sleep/wake control
-- Power profile selection
-- AC adapter detection
-
-**Interfaces:**
-```
-/sys/class/power_supply/canon-r5-battery/
-/sys/class/power_supply/canon-r5-grip/
-/sys/class/thermal/thermal_zone0/
-/dev/canon-r5-power
-```
-
-### 7. Event Notification System
-**Features:**
-- Button press events (all physical buttons)
-- Dial rotation events (main, quick control, mode)
-- Joystick movements
-- Card insertion/removal
-- Lens attachment/detachment
-- Error notifications
-- Camera status changes
-
-**Implementation:**
-```
-/dev/input/event* - Input subsystem integration
-/dev/canon-r5-event - Custom event interface
-udev rules for hotplug events
-```
-
-### 8. Lens Communication Driver
-**Features:**
-- RF/EF lens detection
-- Lens metadata reading
-- Focus motor control (with speed control)
-- Aperture control
-- IS coordination with IBIS
-- Lens aberration correction data
-- Focus breathing compensation
-
-**Interface:**
-```
-/sys/class/canon-r5/lens/model
-/sys/class/canon-r5/lens/focal_length
-/sys/class/canon-r5/lens/current_focal
-/sys/class/canon-r5/lens/max_aperture
-/sys/class/canon-r5/lens/min_aperture
-/sys/class/canon-r5/lens/focus_distance
-/sys/class/canon-r5/lens/firmware_version
-```
-
-### 9. Display & EVF Driver
-**Features:**
-- LCD touch input support (3.2" 2.1M dots)
-- EVF detection and switching (5.76M dots, 120fps)
-- Display brightness control
-- Menu navigation passthrough
-- Custom info overlays
-- Histogram display
-- Focus peaking overlay
-- Zebra pattern overlay
-
-**Implementation:**
-```
-/dev/input/touchscreen0 - LCD touch input
-/dev/fb1 - Framebuffer for overlays
-/sys/class/backlight/canon-r5-lcd/
-/sys/class/backlight/canon-r5-evf/
-/sys/class/canon-r5/display/info_level
-```
-
-### 10. GPS/WiFi/Bluetooth Drivers
-**Features:**
-- GPS location tagging
-- WiFi 5GHz/2.4GHz support
-- WiFi access point mode
-- Bluetooth LE remote control
-- Time synchronization
-- Smartphone app integration (Camera Connect)
-- FTP/FTPS transfer
-- Cloud service integration
-
-**Interfaces:**
-```
-/dev/ttyGPS0 - GPS NMEA stream
-/sys/class/net/wlan1 - WiFi interface
-/dev/rfcomm0 - Bluetooth serial
-Standard Linux wireless subsystem integration
-```
-
-## Technical Architecture
-
-### Core Infrastructure
-
-1. **USB Transport Layer** (`drivers/core/canon-r5-usb.c`)
-   - USB 3.1 Gen 2 support (10Gbps)
-   - Multiple endpoint management
-   - Bulk transfer optimization
-   - USB Power Delivery negotiation
-
-2. **PTP/MTP Protocol Core** (`drivers/core/canon-r5-ptp.c`)
-   - Standard PTP implementation
-   - Canon vendor extensions
-   - MTP storage operations
-   - Event handling system
-
-3. **Core Driver** (`drivers/core/canon-r5-core.c`)
-   - Module initialization/cleanup
-   - Device probe/disconnect handling
-   - Resource management
-   - Inter-module communication
-
-### Key PTP Commands (Canon Extensions)
-
-```c
-// Live view control
-#define CANON_PTP_LIVEVIEW_START    0x9153
-#define CANON_PTP_LIVEVIEW_STOP     0x9154
-#define CANON_PTP_GET_LIVEVIEW      0x9155
-
-// Camera settings
-#define CANON_PTP_SET_PROPERTY      0x9110
-#define CANON_PTP_GET_PROPERTY      0x9127
-```
-
-### V4L2 Implementation Details
-
-- **Device Type**: V4L2_CAP_VIDEO_CAPTURE
-- **Buffer Management**: videobuf2 with MMAP support
-- **Formats**: MJPEG primary, YUV422 if available
-- **Controls**: Exposure, ISO, aperture via V4L2 extended controls
-
-## Implementation Roadmap
-
-### Phase 1: Core Infrastructure (Weeks 1-3)
-**Goal:** Establish foundation for all driver components
-
-#### Week 1: Development Environment & USB Core
-- [ ] Set up kernel development environment
-- [ ] Create modular driver architecture
-- [ ] Implement USB device enumeration (VID: 0x04A9)
-- [ ] Basic module loading/unloading
-- [ ] USB endpoint configuration
-
-#### Week 2: PTP/MTP Protocol Core
-- [ ] Capture and analyze Canon EOS Utility USB traffic
-- [ ] Implement PTP session management
-- [ ] Basic PTP command/response handling
-- [ ] Canon vendor extension framework
-- [ ] Event handling system
-
-#### Week 3: Core Driver Infrastructure
-- [ ] Inter-module communication framework
-- [ ] Resource management system
-- [ ] Basic sysfs structure
-- [ ] Error handling and recovery
-- [ ] Logging and debugging infrastructure
-
-### Phase 2: Image & Video Capture (Weeks 4-6)
-**Goal:** Enable basic photo and video functionality
-
-#### Week 4: V4L2 Video Driver
-- [ ] V4L2 device registration
-- [ ] Implement streaming ioctls
-- [ ] videobuf2 integration
-- [ ] MJPEG format support
-- [ ] Live view protocol implementation
-
-#### Week 5: Still Image Capture
-- [ ] Still capture PTP commands
-- [ ] RAW (CR3) format support
-- [ ] JPEG capture implementation
-- [ ] Basic EXIF metadata
-- [ ] Single shot mode
-
-#### Week 6: Capture Optimization
-- [ ] Burst mode implementation
-- [ ] Buffer optimization
-- [ ] Zero-copy mechanisms
-- [ ] Performance profiling
-- [ ] Initial testing suite
-
-### Phase 3: Storage & Audio (Weeks 7-9)
-**Goal:** Complete media handling capabilities
-
-#### Week 7: MTP Storage Driver
-- [ ] MTP filesystem implementation
-- [ ] Card detection and management
-- [ ] File operations (read/write/delete)
-- [ ] Thumbnail generation
-- [ ] Dual card support
-
-#### Week 8: ALSA Audio Driver
-- [ ] ALSA device registration
-- [ ] Audio capture implementation
-- [ ] Microphone input controls
-- [ ] Audio/video synchronization
-- [ ] Sample rate configuration
-
-#### Week 9: Media Integration
-- [ ] Unified media pipeline
-- [ ] Synchronized capture modes
-- [ ] Format conversion utilities
-- [ ] Media metadata handling
-- [ ] Integration testing
-
-### Phase 4: Camera Control (Weeks 10-12)
-**Goal:** Full camera control and advanced features
-
-#### Week 10: Control Interfaces
-- [ ] Complete sysfs hierarchy
-- [ ] Exposure controls (M/Av/Tv/P modes)
-- [ ] Focus system implementation
-- [ ] White balance and picture styles
-- [ ] Custom function controls
-
-#### Week 11: Advanced Features
-- [ ] IBIS implementation
-- [ ] Lens communication protocol
-- [ ] HDR and bracketing modes
-- [ ] Intervalometer and timelapse
-- [ ] Focus stacking support
-
-#### Week 12: Input & Display
-- [ ] Button/dial input drivers
-- [ ] Touchscreen support
-- [ ] LCD/EVF management
-- [ ] Menu system interface
-- [ ] Overlay rendering
-
-### Phase 5: Wireless & Power (Weeks 13-14)
-**Goal:** Complete ecosystem integration
-
-#### Week 13: Wireless Features
-- [ ] GPS driver implementation
-- [ ] WiFi integration
-- [ ] Bluetooth LE support
-- [ ] Remote control protocol
-- [ ] Cloud service connectivity
-
-#### Week 14: Power & Polish
-- [ ] Power management optimization
-- [ ] Battery monitoring
-- [ ] Thermal management
-- [ ] USB Power Delivery
-- [ ] System integration testing
-
-### Phase 6: Userspace & Documentation (Weeks 15-16)
-**Goal:** Production-ready release
-
-#### Week 15: Userspace Tools
-- [ ] libcanon-r5 library
-- [ ] Command-line interface
-- [ ] GUI application framework
-- [ ] gphoto2 plugin
-- [ ] System daemon
-
-#### Week 16: Final Release
-- [ ] Complete documentation
-- [ ] Performance benchmarks
-- [ ] Compatibility testing
-- [ ] Bug fixes and optimization
-- [ ] Release preparation
-
-## Development Status
-
-### Current Progress
-- ✅ Project planning and architecture design
-- ✅ Comprehensive driver suite specification
-- 🔄 Setting up development environment
-- ⏳ Beginning USB core implementation
-
-### Next Steps
-1. Install development dependencies
-2. Set up USB protocol analysis environment
-3. Create initial kernel module skeleton
-4. Begin USB device enumeration
-
-## Build System
-
-### Makefile Structure
-```makefile
-obj-m += canon-r5.o
-canon-r5-objs := src/canon-r5-main.o src/canon-r5-usb.o src/canon-r5-v4l2.o src/canon-r5-ptp.o
-
-KERNEL_DIR := /lib/modules/$(shell uname -r)/build
-PWD := $(shell pwd)
-
-all:
-	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules
-
-clean:
-	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) clean
-```
-
-### Dependencies
-- Linux kernel headers (matching running kernel)
-- USB subsystem support
-- V4L2 subsystem support
-- videobuf2 framework
-
-## Development Tools
-
-### Required Packages (Ubuntu/Debian)
 ```bash
-sudo apt install build-essential linux-headers-$(uname -r) v4l-utils
+# Ubuntu/Debian
+sudo apt install build-essential linux-headers-$(uname -r) git
+
+# Fedora/RHEL
+sudo dnf install kernel-devel kernel-headers gcc make git
+
+# Arch Linux
+sudo pacman -S linux-headers base-devel git
 ```
 
-### Protocol Analysis Tools
-- Wireshark with USBPcap for Windows (protocol capture)
-- libgphoto2 source code (reference implementation)
-- v4l2-ctl (testing V4L2 interface)
+### Installation
 
-### Testing Commands
 ```bash
+git clone https://github.com/your-username/canon-r5-linux-driver.git
+cd canon-r5-linux-driver
+make
+sudo make install
+```
+
+### Loading Drivers
+
+```bash
+# Load core modules
+sudo modprobe canon-r5-core
+sudo modprobe canon-r5-usb
+
+# Load feature modules (optional)
+sudo modprobe canon-r5-video    # For video streaming
+sudo modprobe canon-r5-still    # For still image capture
+sudo modprobe canon-r5-audio    # For audio recording
+sudo modprobe canon-r5-storage  # For file transfer
+```
+
+### Basic Usage
+
+After connecting your Canon R5:
+
+```bash
+# Check if camera is detected
+lsusb | grep Canon
+
 # List video devices
 v4l2-ctl --list-devices
 
-# Test capture
-v4l2-ctl --device=/dev/video0 --stream-mmap --stream-count=10
+# Stream video with ffmpeg
+ffmpeg -f v4l2 -i /dev/video0 output.mp4
 
-# Stream with ffmpeg
-ffmpeg -f v4l2 -i /dev/video0 -t 10 test.mp4
+# Check camera files via MTP
+gio mount mtp://Canon_R5/
+
+# Monitor camera events
+dmesg | grep canon-r5
 ```
 
-## Protocol Reverse Engineering
+## Camera Setup
 
-### Canon EOS Utility Analysis
-1. Install Canon EOS Utility on Windows VM
-2. Use Wireshark with USBPcap to capture USB traffic
-3. Identify PTP command sequences for:
-   - Camera connection/initialization
-   - Live view start/stop
-   - Frame requests
-   - Setting changes
+1. **Power on** your Canon R5
+2. Navigate to **Menu → Communication Settings → USB Connection**
+3. Select **PC Connection** mode
+4. Connect USB-C cable to camera and USB-A/USB-C to computer
+5. Camera LCD should show "PC Connection" indicator
 
-### Key Protocol Elements
-- **PTP over USB**: Standard Picture Transfer Protocol with Canon extensions
-- **Live View Format**: Likely MJPEG compressed frames
-- **Frame Timing**: 30fps typical, varies by camera settings
-- **USB Requirements**: USB 2.0 minimum, USB 3.0 recommended for high resolution
+## Supported Features
 
-## Known Challenges
+| Feature | Status | Interface | Notes |
+|---------|--------|-----------|-------|
+| Video Streaming | ✅ | `/dev/video*` | V4L2 compatible |
+| Still Capture | ✅ | `/dev/canon-r5-still` | RAW/JPEG support |
+| Audio Recording | ✅ | `/dev/snd/pcm*` | ALSA compatible |
+| File Transfer | ⚠️ | MTP mount | Basic implementation |
+| Camera Control | ⚠️ | `/sys/class/canon-r5/` | In development |
+| Battery Monitor | ⚠️ | `/sys/class/power_supply/` | In development |
 
-1. **Canon Proprietary Extensions**: PTP commands are not fully documented
-2. **USB Bandwidth**: High resolution video requires careful buffer management
-3. **Frame Synchronization**: Maintaining consistent framerate
-4. **Power Management**: Preventing camera sleep during streaming
-5. **Multi-camera Support**: Handling multiple R5 devices
+✅ = Fully supported, ⚠️ = Beta/partial support, ❌ = Not implemented
 
-## Testing Strategy
+## Troubleshooting
 
-### Unit Tests
-- PTP command parsing
-- USB communication reliability
-- Buffer management correctness
+### Camera Not Detected
 
-### Integration Tests
-- Full capture pipeline
-- Format conversion accuracy
-- Performance benchmarks
+**Problem**: `lsusb` doesn't show Canon device
 
-### Hardware Tests
-- Multiple Canon R5 units
-- Different USB host controllers
-- Various Linux distributions
+**Solutions**:
+1. Check USB cable connection
+2. Verify camera is in PC Connection mode
+3. Try different USB port (USB 3.0 recommended)
+4. Check dmesg: `dmesg | grep -i usb`
 
-## Key Technical Decisions
+```bash
+# Enable USB debugging
+echo 'module usbcore +p' | sudo tee /sys/kernel/debug/dynamic_debug/control
+```
 
-### Architecture Choices
-1. **Modular Design**: Each driver component as a separate module for independent development
-2. **Shared Core**: Common PTP/USB layer used by all components
-3. **Standard APIs**: Leverage existing Linux subsystems (V4L2, ALSA, MTP, input, power)
-4. **Zero-Copy**: Minimize data copying for performance
-5. **Event-Driven**: Asynchronous design for better responsiveness
+### Module Loading Errors
 
-### Implementation Strategy
-1. **Protocol First**: Focus on understanding Canon's PTP extensions
-2. **Incremental Development**: Start with basic functionality, add features progressively
-3. **Test-Driven**: Comprehensive test suite from the beginning
-4. **Performance Monitoring**: Built-in profiling and benchmarking
-5. **User-Centric**: Design APIs for ease of use
+**Problem**: `modprobe` fails to load modules
 
-### Development Priorities
-1. **Core USB/PTP**: Foundation for everything else
-2. **Basic Capture**: Photo and video before advanced features
-3. **Standard Compliance**: V4L2 and ALSA compliance before custom interfaces
-4. **Stability**: Robust error handling over feature completeness
-5. **Documentation**: Maintain comprehensive docs throughout
+**Check module dependencies**:
+```bash
+sudo depmod -a
+modinfo canon-r5-core
+```
 
-## Immediate Action Items
+**Check for conflicts**:
+```bash
+# Remove conflicting modules
+sudo rmmod gphoto2
+sudo rmmod ptp
 
-### Week 1 Tasks
-1. **Environment Setup**
-   ```bash
-   # Install dependencies
-   sudo apt install build-essential linux-headers-$(uname -r) \
-                    v4l-utils libv4l-dev libasound2-dev \
-                    wireshark usbutils libusb-1.0-0-dev
-   
-   # Set up Windows VM for protocol analysis
-   # Install Canon EOS Utility
-   # Configure USB passthrough
-   ```
+# Reload canon-r5 modules
+sudo modprobe canon-r5-core
+```
 
-2. **Create Initial Module**
-   ```bash
-   # Create skeleton files
-   mkdir -p drivers/core include/core
-   touch drivers/core/canon-r5-core.c
-   touch drivers/core/canon-r5-usb.c
-   touch include/core/canon-r5.h
-   touch Makefile Kconfig
-   ```
+**Verify kernel headers match**:
+```bash
+uname -r
+ls /lib/modules/$(uname -r)/build
+```
 
-3. **USB Analysis Setup**
-   ```bash
-   # Enable USB debugging
-   echo 'module usbcore +p' | sudo tee /sys/kernel/debug/dynamic_debug/control
-   
-   # Monitor USB devices
-   sudo usbmon -i 0 -fu
-   ```
+### Video Streaming Issues
 
-4. **Begin Protocol Capture**
-   - Connect Canon R5 to Windows VM
-   - Start Wireshark with USBPcap
-   - Capture initialization sequence
-   - Document PTP commands
+**Problem**: No video devices appear
 
-### Development Workflow
-1. **Daily Goals**: Complete at least one checklist item per day
-2. **Testing**: Run tests after each component completion
-3. **Documentation**: Update docs with each new feature
-4. **Code Review**: Self-review with checkpatch.pl
-5. **Version Control**: Commit working code daily
+**Check V4L2 registration**:
+```bash
+# List all video devices
+v4l2-ctl --list-devices
+
+# Check specific device capabilities
+v4l2-ctl -d /dev/video0 --all
+
+# Test basic capture
+v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=10
+```
+
+**Camera-specific checks**:
+- Ensure camera is not in sleep mode
+- Check LCD shows "Live View" or streaming indicator
+- Verify USB bandwidth (USB 3.0 for higher resolutions)
+
+### Still Image Capture Problems
+
+**Problem**: Cannot capture images or access files
+
+**Check PTP session**:
+```bash
+# Monitor PTP communication
+dmesg | grep canon-r5-ptp
+
+# Verify capture device
+ls -l /dev/canon-r5-*
+
+# Test basic capture
+echo "single" > /sys/class/canon-r5/capture/mode
+echo "trigger" > /sys/class/canon-r5/capture/action
+```
+
+**File system access**:
+```bash
+# Check MTP mounts
+gio mount -l | grep -i canon
+
+# Manual MTP mount
+simple-mtpfs /mnt/camera
+
+# Check available space
+df -h /mnt/camera
+```
+
+### Audio Recording Issues
+
+**Problem**: No audio capture device
+
+**ALSA troubleshooting**:
+```bash
+# List audio devices
+arecord -l
+
+# Test audio capture
+arecord -D hw:Canon,0 -f cd test.wav
+
+# Check mixer controls
+amixer -c Canon contents
+```
+
+### Permission Problems
+
+**Problem**: Access denied errors
+
+**Fix udev permissions**:
+```bash
+# Check current permissions
+ls -l /dev/video* /dev/canon-r5-*
+
+# Add user to video group
+sudo usermod -a -G video $USER
+
+# Create udev rules (optional)
+sudo tee /etc/udev/rules.d/99-canon-r5.rules << EOF
+SUBSYSTEM=="usb", ATTR{idVendor}=="04a9", MODE="0666"
+KERNEL=="video*", SUBSYSTEM=="video4linux", MODE="0664", GROUP="video"
+EOF
+
+sudo udevadm control --reload
+```
+
+## Performance Optimization
+
+### USB Performance
+```bash
+# Check USB speed
+lsusb -t
+
+# Optimize USB buffer sizes
+echo 16 > /sys/module/usbcore/parameters/usbfs_memory_mb
+
+# Disable USB autosuspend for camera
+echo on > /sys/bus/usb/devices/*/power/control
+```
+
+### Video Streaming
+```bash
+# Reduce CPU usage with hardware acceleration
+ffmpeg -f v4l2 -i /dev/video0 -c:v h264_vaapi output.mp4
+
+# Adjust V4L2 buffer count
+v4l2-ctl -d /dev/video0 --set-fmt-video=width=1920,height=1080,pixelformat=MJPG
+```
+
+## Advanced Configuration
+
+### Manual Module Parameters
+
+```bash
+# Load with debug enabled
+sudo modprobe canon-r5-core debug=1
+
+# Adjust buffer sizes
+sudo modprobe canon-r5-video buffers=8
+
+# Enable experimental features
+sudo modprobe canon-r5-still raw_support=1
+```
+
+### Persistent Settings
+
+Create `/etc/modprobe.d/canon-r5.conf`:
+```
+# Canon R5 driver options
+options canon-r5-core debug=0
+options canon-r5-video buffers=4
+options canon-r5-still raw_support=1
+```
+
+## Known Limitations
+
+1. **USB PIDs**: Currently uses placeholder values - may not detect all R5 variants
+2. **Live View Resolution**: Limited to camera's USB streaming capabilities
+3. **Dual Card Access**: Simultaneous access to both cards not fully implemented
+4. **WiFi Features**: Camera's built-in WiFi not accessible through driver
+5. **Lens Control**: Limited lens communication (focus/aperture only)
+
+## Getting Help
+
+### Debug Information
+Before reporting issues, collect this information:
+
+```bash
+# System info
+uname -a
+lsb_release -a
+
+# Hardware info
+lsusb -v | grep -A 20 Canon
+lsmod | grep canon
+
+# Driver logs
+dmesg | grep canon-r5 | tail -50
+
+# Module info
+modinfo canon-r5-core
+```
+
+### Support Channels
+
+- **GitHub Issues**: Primary support channel
+- **Discussions**: General questions and community support
+- **Wiki**: Additional documentation and tutorials
+
+### Reporting Bugs
+
+Include the following in bug reports:
+1. Kernel version (`uname -r`)
+2. Distribution and version
+3. Canon R5 firmware version
+4. Complete dmesg output
+5. Steps to reproduce
+6. Expected vs actual behavior
 
 ## Contributing
 
+See [PROGRESS.md](PROGRESS.md) for development status and technical details.
+
+### Development Setup
+```bash
+# Install development dependencies
+sudo apt install linux-headers-$(uname -r) build-essential \
+                 v4l-utils libv4l-dev libasound2-dev
+
+# Build and test
+make clean
+make DEBUG=1
+sudo make install
+make test
+```
+
 ### Code Style
-- Linux kernel coding style (checkpatch.pl clean)
-- Proper error handling with goto cleanup
-- Minimal memory allocations in hot paths
-- Clear function naming and documentation
-
-### Commit Message Format
-```
-subsystem: brief description
-
-Longer explanation of the change, including:
-- Why the change was made
-- Any side effects
-- References to issues or specifications
-
-Signed-off-by: Your Name <email@example.com>
-```
+- Follow Linux kernel coding standards
+- Run `checkpatch.pl` before submitting
+- Include proper error handling and cleanup
 
 ## License
 
-This project is licensed under GPL v2, consistent with Linux kernel modules.
+GPL v2 - See [LICENSE](LICENSE) file for details.
 
-## Resources
-
-### Documentation
-- [Linux USB API](https://www.kernel.org/doc/html/latest/driver-api/usb/index.html)
-- [V4L2 API Specification](https://www.kernel.org/doc/html/latest/userspace-api/media/v4l/v4l2.html)
-- [PTP Specification](https://www.usb.org/sites/default/files/PIMA15740-2000_Final.pdf)
-
-### Reference Code
-- [libgphoto2 Canon support](https://github.com/gphoto/libgphoto2/tree/master/camlibs/ptp2)
-- [Linux UVC driver](https://github.com/torvalds/linux/tree/master/drivers/media/usb/uvc)
-- [Linux V4L2 examples](https://github.com/torvalds/linux/tree/master/samples/v4l)
-
-### Hardware
-- Canon R5 official specifications
-- USB 3.0 specification
-- Canon SDK documentation (if available)
+This project is not affiliated with Canon Inc. Canon and EOS are trademarks of Canon Inc.

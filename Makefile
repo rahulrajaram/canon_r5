@@ -34,16 +34,14 @@ canon-r5-video-objs := drivers/video/canon-r5-v4l2.o \
 obj-m += canon-r5-still.o
 canon-r5-still-objs := drivers/still/canon-r5-still.o
 
-# Audio drivers (when implemented)
-# obj-m += canon-r5-audio.o
-# canon-r5-audio-objs := drivers/audio/canon-r5-alsa.o \
-#                        drivers/audio/canon-r5-audio-sync.o
+# Audio drivers
+obj-m += canon-r5-audio.o
+canon-r5-audio-objs := drivers/audio/canon-r5-audio.o
 
-# Storage drivers (when implemented)
-# obj-m += canon-r5-storage.o
-# canon-r5-storage-objs := drivers/storage/canon-r5-mtp.o \
-#                          drivers/storage/canon-r5-cards.o \
-#                          drivers/storage/canon-r5-metadata.o
+# Storage drivers
+obj-m += canon-r5-storage.o
+canon-r5-storage-objs := drivers/storage/canon-r5-storage.o \
+                         drivers/storage/canon-r5-filesystem.o
 
 # Control drivers (when implemented)
 # obj-m += canon-r5-control.o
@@ -98,17 +96,28 @@ all: modules
 modules:
 	@echo "Building Canon R5 Driver Suite v$(MODULE_VERSION)"
 	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules
+	@mkdir -p build/modules build/objects build/intermediate
+	@echo "Organizing build artifacts..."
+	@mv *.ko build/modules/ 2>/dev/null || true
+	@mv *.o build/objects/ 2>/dev/null || true
+	@mv *.mod* build/intermediate/ 2>/dev/null || true
+	@mv .*.cmd build/intermediate/ 2>/dev/null || true
+	@mv modules.order Module.symvers build/intermediate/ 2>/dev/null || true
 
 # Clean build artifacts
 clean:
 	@echo "Cleaning Canon R5 Driver Suite build artifacts"
 	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) clean
+	rm -rf build/
 	rm -f Module.markers modules.order
 
 # Install modules
 install: modules
 	@echo "Installing Canon R5 Driver Suite modules"
-	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules_install
+	@echo "Copying modules from build/modules/ to system..."
+	@cp build/modules/*.ko /lib/modules/$(shell uname -r)/extra/ 2>/dev/null || \
+		(echo "Creating extra directory..." && mkdir -p /lib/modules/$(shell uname -r)/extra/ && \
+		 cp build/modules/*.ko /lib/modules/$(shell uname -r)/extra/)
 	@echo "Running depmod to update module dependencies"
 	/sbin/depmod -a
 
@@ -199,29 +208,150 @@ package: clean
 		*
 	@echo "Package created: dist/canon-r5-driver-$(MODULE_VERSION).tar.gz"
 
+# Test targets
+test-unit:
+	@echo "Running unit tests (KUnit)"
+	@if [ -d tests/kunit ]; then \
+		echo "Building KUnit test modules..."; \
+		$(MAKE) -C $(KERNEL_DIR) M=$(PWD)/tests/kunit modules || echo "KUnit build failed"; \
+	else \
+		echo "No KUnit tests found"; \
+	fi
+
+test-integration:
+	@echo "Running integration tests"
+	@if [ -x tests/integration/test_driver_loading.sh ]; then \
+		export CANON_R5_TEST_ENV=1; \
+		tests/integration/test_driver_loading.sh; \
+	else \
+		echo "Integration test script not found or not executable"; \
+	fi
+
+test-performance:
+	@echo "Running performance benchmarks"
+	@if [ -x tests/performance/benchmark.py ]; then \
+		python3 tests/performance/benchmark.py --verbose --output test-results-$$(date +%Y%m%d-%H%M%S).json; \
+	else \
+		echo "Performance benchmark script not found"; \
+	fi
+
+test-all: test-unit test-integration test-performance
+	@echo "All tests completed"
+
+# Static analysis targets
+check-style:
+	@echo "Running style checks"
+	@for file in drivers/*/*.c include/*/*.h; do \
+		if [ -f "$$file" ]; then \
+			echo "Checking $$file"; \
+			$(KERNEL_DIR)/scripts/checkpatch.pl --no-tree --file $$file || true; \
+		fi; \
+	done
+
+check-security:
+	@echo "Running basic security checks"
+	@echo "Checking for unsafe string functions..."
+	@if grep -r "strcpy\|strcat\|sprintf\|gets" drivers/ include/; then \
+		echo "Warning: Found potentially unsafe string functions"; \
+	else \
+		echo "No unsafe string functions found"; \
+	fi
+	@echo "Checking for proper input validation..."
+	@if grep -r "copy_from_user\|copy_to_user" drivers/; then \
+		echo "Found user space copying functions"; \
+	else \
+		echo "No user space copying found"; \
+	fi
+
+check-license:
+	@echo "Checking license compliance"
+	@missing_spdx=$$(find drivers/ include/ tests/ -name "*.c" -o -name "*.h" -o -name "*.py" -o -name "*.sh" | xargs grep -L "SPDX-License-Identifier" 2>/dev/null || true); \
+	if [ -n "$$missing_spdx" ]; then \
+		echo "Files missing SPDX headers:"; \
+		echo "$$missing_spdx"; \
+	else \
+		echo "All files have SPDX headers"; \
+	fi
+
+check-all: check-style check-security check-license
+	@echo "All checks completed"
+
+# Documentation targets
+docs-check:
+	@echo "Checking documentation completeness"
+	@components="video audio storage still"; \
+	for comp in $$components; do \
+		if ! grep -qi "$$comp" README.md 2>/dev/null; then \
+			echo "Warning: README.md may not mention $$comp component"; \
+		fi; \
+	done
+
+docs-stats:
+	@echo "Documentation statistics"
+	@total_c_lines=$$(find drivers/ -name "*.c" -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $$1}' || echo "0"); \
+	total_h_lines=$$(find include/ -name "*.h" -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $$1}' || echo "0"); \
+	echo "Lines of C code: $$total_c_lines"; \
+	echo "Lines of headers: $$total_h_lines"; \
+	echo "Total lines: $$((total_c_lines + total_h_lines))"
+
+# Coverage targets (future enhancement)
+coverage:
+	@echo "Code coverage analysis (requires gcov support)"
+	@echo "This feature requires kernel built with CONFIG_GCOV_KERNEL=y"
+
+# Continuous integration target
+ci: clean modules check-all test-all
+	@echo "Continuous integration checks completed"
+
 # Help target
 help:
 	@echo "Canon R5 Driver Suite Build System"
 	@echo ""
-	@echo "Available targets:"
+	@echo "Build targets:"
 	@echo "  all        - Build all modules (default)"
 	@echo "  modules    - Build kernel modules"
 	@echo "  clean      - Clean build artifacts"
 	@echo "  install    - Install modules to system"
 	@echo "  uninstall  - Remove modules from system"
+	@echo ""
+	@echo "Runtime targets:"
 	@echo "  load       - Load modules into kernel"
 	@echo "  unload     - Unload modules from kernel"
 	@echo "  reload     - Unload and reload modules"
 	@echo "  status     - Show module and device status"
-	@echo "  checkpatch - Run kernel checkpatch on source"
+	@echo ""
+	@echo "Test targets:"
+	@echo "  test           - Test module loading/unloading"
+	@echo "  test-unit      - Run unit tests (KUnit)"
+	@echo "  test-integration - Run integration tests"
+	@echo "  test-performance - Run performance benchmarks"
+	@echo "  test-all       - Run all tests"
+	@echo ""
+	@echo "Quality assurance:"
+	@echo "  checkpatch     - Run kernel checkpatch on source"
+	@echo "  check-style    - Run style checks"
+	@echo "  check-security - Run security checks"
+	@echo "  check-license  - Check license compliance"
+	@echo "  check-all      - Run all checks"
+	@echo ""
+	@echo "Documentation:"
 	@echo "  docs       - Build documentation (requires doxygen)"
+	@echo "  docs-check - Check documentation completeness"
+	@echo "  docs-stats - Show documentation statistics"
+	@echo ""
+	@echo "Development:"
 	@echo "  dev-setup  - Setup development environment"
-	@echo "  test       - Test module loading/unloading"
 	@echo "  package    - Create distribution package"
+	@echo "  ci         - Run full CI pipeline"
+	@echo "  coverage   - Generate code coverage report"
 	@echo "  help       - Show this help message"
 	@echo ""
 	@echo "Environment variables:"
 	@echo "  DEBUG=1    - Enable debug build"
 	@echo "  KERNEL_DIR - Override kernel build directory"
+	@echo "  CANON_R5_TEST_ENV=1 - Enable test environment mode"
 
-.PHONY: all modules clean install uninstall load unload reload status checkpatch docs dev-setup test package help
+.PHONY: all modules clean install uninstall load unload reload status checkpatch docs dev-setup test package help \
+        test-unit test-integration test-performance test-all \
+        check-style check-security check-license check-all \
+        docs-check docs-stats coverage ci
